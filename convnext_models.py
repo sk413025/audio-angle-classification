@@ -41,7 +41,7 @@ class ConvNeXtBlock(nn.Module):
             norm_layer = partial(nn.LayerNorm, eps=1e-6)
 
         # Depthwise conv
-        self.dwconv = nn.Conv2d(dim, dim, kernel_size=7, padding=3, groups=dim)
+        self.dwconv = nn.Conv2d(dim, dim, kernel_size=7, padding=9, dilation=3, groups=dim)
         
         # Inverted bottleneck
         self.norm = norm_layer(dim)
@@ -104,35 +104,35 @@ class ConvNeXtAudioRanker(nn.Module):
         # 頻譜圖適配器
         self.adapter = SpectrogramAdapter()
         
-        # 初始卷積層減少空間維度
+        # 初始卷積層修改
         self.stem = nn.Sequential(
-            nn.Conv2d(1, 64, kernel_size=4, stride=(2, 4)),
+            nn.Conv2d(1, 64, kernel_size=4, stride=(2, 2)),  # 降低時間維度的下採樣率
             LayerNorm2d(64),
         )
         
-        # ConvNeXt主幹網路
+        # ConvNeXt主幹網路 - 恢復所有階段但調整深度
         self.stages = nn.Sequential(
             # Stage 1
-            self._make_stage(64, 128, depth=3, stride=(2, 2)),
+            self._make_stage(64, 128, depth=2, stride=(2, 2)),
             
             # Stage 2
-            self._make_stage(128, 256, depth=3, stride=(2, 2)),
+            self._make_stage(128, 256, depth=2, stride=(2, 2)),
             
-            # # Stage 3
-            # self._make_stage(256, 512, depth=9, stride=(2, 2)),
+            # Stage 3
+            self._make_stage(256, 384, depth=4, stride=(2, 2)),
             
-            # # Stage 4
-            # self._make_stage(512, 512, depth=3, stride=(2, 2)),
+            # Stage 4
+            self._make_stage(384, 512, depth=2, stride=(2, 2)),
         )
         
         # 自適應池化確保輸出大小一致
         self.adaptive_pool = nn.AdaptiveAvgPool2d((1, 1))
         
-        # 最終層正規化
-        self.norm = LayerNorm2d(256)
+        # 最終層正規化 - 修正為512通道
+        self.norm = LayerNorm2d(512)
         
-        # 特徵維度
-        self.feature_dim = 256
+        # 特徵維度 - 修正為512
+        self.feature_dim = 512
         
         # 分類器
         self.classifier = nn.Sequential(

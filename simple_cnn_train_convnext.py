@@ -107,7 +107,7 @@ def train_convnext_model(frequency, material, selected_seqs=config.SEQ_NUMS):
     
     # 打印模型信息
     print(model)
-    model.print_trainable_parameters()
+    # model.print_trainable_parameters()
     
     # 損失函數和優化器
     criterion = nn.MarginRankingLoss(margin=config.MARGIN)
