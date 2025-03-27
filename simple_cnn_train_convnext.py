@@ -1,8 +1,8 @@
 """
-簡單CNN模型訓練腳本
+ConvNeXt模型訓練腳本
 功能：
 - 實現頻譜圖數據加載與預處理
-- 配置並訓練CNN模型
+- 配置並訓練ConvNeXt模型
 - 保存訓練好的模型
 - 評估模型性能
 """
@@ -15,21 +15,20 @@ from torch.utils.data import DataLoader
 from datetime import datetime
 
 from datasets import SpectrogramDatasetWithMaterial, RankingPairDataset
-# from simple_cnn_models import SimpleCNNAudioRanker
-# from simple_cnn_models_native import SimpleCNNAudioRanker
-from convnext_models import ConvNeXtAudioRanker as SimpleCNNAudioRanker
+# 使用ConvNeXt模型替換簡單CNN模型
+from convnext_models import ConvNeXtAudioRanker
 import config
 
-def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
+def train_convnext_model(frequency, material, selected_seqs=config.SEQ_NUMS):
     """
-    訓練簡單CNN模型進行角度分類
+    訓練ConvNeXt模型進行角度分類
 
     參數:
         frequency: 使用的頻率數據
         material: 使用的材質
         selected_seqs: 選擇的序列編號
     """
-    print(f"開始訓練CNN模型 - 頻率: {frequency}, 材質: {material}")
+    print(f"開始訓練ConvNeXt模型 - 頻率: {frequency}, 材質: {material}")
     
     # 設置裝置
     device = config.DEVICE
@@ -49,7 +48,7 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
         return
         
     # 添加訓練集和驗證集分割
-    train_size = int(0.7 * len(dataset))  # 80% 作為訓練集
+    train_size = int(0.7 * len(dataset))  # 70% 作為訓練集
     val_size = len(dataset) - train_size
     
     # 確保訓練集和驗證集都至少有4個樣本（允許最小批次大小為2）
@@ -103,7 +102,7 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
     print(f"使用的批次大小: {batch_size}")
 
     # 初始化模型
-    model = SimpleCNNAudioRanker(n_freqs=dataset.data.shape[2] if dataset.data is not None else None)
+    model = ConvNeXtAudioRanker(n_freqs=dataset.data.shape[2] if dataset.data is not None else None)
     model.to(device)
     
     # 打印模型信息
@@ -112,15 +111,17 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
     
     # 損失函數和優化器
     criterion = nn.MarginRankingLoss(margin=config.MARGIN)
-    optimizer = optim.Adam(
+    
+    # ConvNeXt特有的優化器設置 - 使用AdamW並應用權重衰減
+    optimizer = optim.AdamW(
         filter(lambda p: p.requires_grad, model.parameters()),
-        lr=config.LEARNING_RATE,
-        weight_decay=config.WEIGHT_DECAY
+        lr=1e-4,  # ConvNeXt通常使用較小的學習率
+        weight_decay=0.05  # ConvNeXt推薦的權重衰減值
     )
     
-    # 學習率調度器
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=2, verbose=True
+    # 學習率調度器 - 添加余弦衰減調度器
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=config.NUM_EPOCHS, eta_min=1e-6
     )
     
     # 初始化記錄指標的列表
@@ -168,6 +169,9 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
             # 反向傳播
             loss.backward()
             
+            # 梯度裁剪 - 防止梯度爆炸
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
             # 更新參數
             optimizer.step()
             
@@ -209,6 +213,9 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
                 val_correct += predictions.sum().item()
                 val_total += targets.size(0)
         
+        # 更新學習率調度器
+        scheduler.step()
+        
         # 計算並打印訓練和驗證指標
         if len(train_dataloader) > 0:
             train_loss = train_loss / len(train_dataloader)
@@ -227,16 +234,14 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
         print(f"Epoch {epoch+1}")
         print(f"Training - Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.2f}%")
         print(f"Validation - Loss: {val_loss:.4f}, Accuracy: {val_accuracy:.2f}%")
-        
-        # 使用驗證損失來更新學習率調度器
-        scheduler.step(val_loss)
+        print(f"Learning Rate: {optimizer.param_groups[0]['lr']:.6f}")
         
         # 使用驗證損失來保存最佳模型
         if val_loss < best_loss:
             best_loss = val_loss
             model_path = os.path.join(
                 config.SAVE_DIR,
-                f"simple_cnn_{material}_{frequency}_best_{timestamp}.pt"
+                f"convnext_{material}_{frequency}_best_{timestamp}.pt"
             )
             torch.save({
                 'epoch': epoch + 1,
@@ -257,7 +262,7 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
     # 保存訓練歷史記錄
     history_path = os.path.join(
         config.SAVE_DIR,
-        f"training_history_{material}_{frequency}_{timestamp}.pt"
+        f"training_history_convnext_{material}_{frequency}_{timestamp}.pt"
     )
     torch.save(training_history, history_path)
     print(f"Training history saved to {history_path}")
@@ -267,4 +272,4 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
 if __name__ == "__main__":
     # 訓練所有頻率下的模型
     for freq in config.FREQUENCIES:
-        train_cnn_model(freq, config.MATERIAL)
+        train_convnext_model(freq, config.MATERIAL) 
