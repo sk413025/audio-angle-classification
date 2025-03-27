@@ -77,7 +77,6 @@ class SimpleCNNAudioRanker(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(self.feature_dim, 128),
             nn.ReLU(),
-            nn.Dropout(0.5),
             nn.Linear(128, 1)  # 輸出維度為1的排序分數
         )
         

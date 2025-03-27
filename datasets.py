@@ -14,10 +14,8 @@ from torch.utils.data import Dataset
 from config import SAMPLE_RATE, MATERIAL, SEQ_NUMS  # 假設這些參數在 config.py 中定義
 
 # STFT 參數
-N_FFT = 4096
-HOP_LENGTH = 64
-WIN_LENGTH = 1024
-WINDOW = 'hann'
+N_FFT = 2048
+HOP_LENGTH = 256
 
 class SpectrogramDatasetWithMaterial(Dataset):
     """
@@ -173,7 +171,7 @@ class RankingPairDataset(Dataset):
         # 隨機生成樣本對
         for _ in range(n_pairs):
             # 隨機選擇兩個不同的樣本
-            sample1, sample2 = np.random.choice(len(all_data), 2, replace=False)
+            sample1, sample2 = np.random.choice(len(all_data), 2, replace=True)
             idx1, label1 = all_data[sample1]
             idx2, label2 = all_data[sample2]
             
