@@ -7,6 +7,15 @@ from matplotlib import pyplot as plt
 import seaborn as sns
 import sys
 
+# IMPORT_CONFIG_COMPLETE
+# Add the parent directory to the Python path
+import os
+import sys
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+# Import from parent directory
 # 增加遞迴深度限制
 sys.setrecursionlimit(10000)
 

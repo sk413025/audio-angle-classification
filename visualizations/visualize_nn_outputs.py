@@ -18,35 +18,16 @@ matplotlib.use('Agg')  # Set backend
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 import sys
 
-# Add current directory to path to ensure modules can be found
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# IMPORT_CONFIG_COMPLETE
+# Add the parent directory to the Python path
+import os
+import sys
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
 # Try different import approaches
-try:
-    # Method 1: Import from angle_classification_deg6 subdirectory
-    from angle_classification_deg6.datasets import SpectrogramDatasetWithMaterial
-    from angle_classification_deg6.simple_cnn_models import SimpleCNNAudioRanker
-    from angle_classification_deg6 import config
-    print("Successfully imported modules from angle classification subdirectory")
-except ImportError:
-    try:
-        # Method 2: Assume files are in current directory
-        from datasets import SpectrogramDatasetWithMaterial
-        from simple_cnn_models import SimpleCNNAudioRanker
-        import config
-        print("Successfully imported modules from current directory")
-    except ImportError:
-        # Method 3: Try importing from parent directory
-        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        try:
-            from datasets import SpectrogramDatasetWithMaterial
-            from simple_cnn_models import SimpleCNNAudioRanker
-            import config
-            print("Successfully imported modules from parent directory")
-        except ImportError:
-            print("Could not find required modules. Please check file paths.")
-            print("Please place datasets.py, simple_cnn_models.py, and config.py in the same directory as this script, or adjust the paths.")
-            sys.exit(1)
+
 
 def get_angle_from_class(class_name):
     """Extract angle value from class name"""
@@ -241,7 +222,7 @@ def main():
     # Get latest model file for the specified frequency
     model_files = [
         f for f in os.listdir(config.SAVE_DIR) 
-        if f.startswith('simple_cnn_') 
+        if f.startswith('resnet18_') 
         and selected_freq in f 
         and f.endswith('.pt')
     ]
@@ -259,14 +240,17 @@ def main():
     # Parse frequency and material information from filename
     parts = latest_model.split('_')
     try:
-        material = parts[2]
-        frequency = parts[3]
+        # material = parts[2]
+        # frequency = parts[3]
+        material = "plastic"
+        frequency = "500hz"
     except IndexError:
         print("Error parsing model filename. Using default values.")
         material = "unknown"
         frequency = "unknown"
     
     # Load dataset
+    # import ipdb; ipdb.set_trace()
     dataset = SpectrogramDatasetWithMaterial(
         config.DATA_ROOT,
         config.CLASSES,
@@ -283,6 +267,7 @@ def main():
     
     # Load model
     model = SimpleCNNAudioRanker(n_freqs=dataset.data.shape[2])
+    # model = ResNetAudioRanker(n_freqs=dataset.data.shape[2])
     checkpoint = torch.load(model_path, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
@@ -298,20 +283,20 @@ def main():
     print("Generating visualization charts...")
     
     # 1. Output by angle violin plot
-    violin_path = os.path.join(plots_dir, f'output_by_angle_{material}_{frequency}.png')
-    plot_outputs_by_angle(outputs, angles, violin_path)
+    # violin_path = os.path.join(plots_dir, f'output_by_angle_{material}_{frequency}.png')
+    # plot_outputs_by_angle(outputs, angles, violin_path)
     
-    # 2. Output distribution heatmap
-    heatmap_path = os.path.join(plots_dir, f'output_heatmap_{material}_{frequency}.png')
-    plot_output_heatmap(outputs, angles, heatmap_path)
+    # # 2. Output distribution heatmap
+    # heatmap_path = os.path.join(plots_dir, f'output_heatmap_{material}_{frequency}.png')
+    # plot_output_heatmap(outputs, angles, heatmap_path)
     
-    # 3. Angle vs. output scatter plot
+    # # 3. Angle vs. output scatter plot
     scatter_path = os.path.join(plots_dir, f'angle_vs_output_{material}_{frequency}.png')
     plot_angle_vs_output_scatter(outputs, angles, scatter_path)
     
-    # 4. Output histogram
-    hist_path = os.path.join(plots_dir, f'output_histogram_{material}_{frequency}.png')
-    plot_output_histogram(outputs, hist_path)
+    # # 4. Output histogram
+    # hist_path = os.path.join(plots_dir, f'output_histogram_{material}_{frequency}.png')
+    # plot_output_histogram(outputs, hist_path)
     
     print("\nVisualization complete! Charts saved to:", plots_dir)
     print(f"Processed {len(outputs)} data points")

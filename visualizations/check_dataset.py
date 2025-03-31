@@ -12,7 +12,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import DataLoader
+import sys
 
+# IMPORT_CONFIG_COMPLETE
+# Add the parent directory to the Python path
+import os
+import sys
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+# Direct imports from parent directory
 from datasets import SpectrogramDatasetWithMaterial
 from config import DEVICE, DATA_ROOT, CLASSES, MATERIALS, MATERIAL, SEQ_NUMS
 

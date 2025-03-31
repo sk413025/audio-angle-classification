@@ -17,12 +17,18 @@ from mpl_toolkits.mplot3d import Axes3D
 import gc
 import torch
 import seaborn as sns
-import config  # 導入 config
 import torch.nn as nn
 
-from config import SAVE_DIR
-from datasets import SpectrogramDatasetWithMaterial
-from simple_cnn_models import SimpleCNNAudioRanker
+# IMPORT_CONFIG_COMPLETE
+# Add the parent directory to the Python path
+import os
+import sys
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+# Import from parent directory
+
 
 def apply_tsne_with_params(X, perplexity=30, n_iter=1000, learning_rate='auto', init='pca'):
     """Apply t-SNE with timing"""

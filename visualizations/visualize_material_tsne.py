@@ -13,6 +13,13 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from sklearn.manifold import TSNE
 import time
 import sys
+# IMPORT_CONFIG_COMPLETE
+# Add the parent directory to the Python path
+import os
+import sys
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 import gc
 import torch
 from torch.utils.data import DataLoader
@@ -23,14 +30,9 @@ if current_dir not in sys.path:
     sys.path.append(current_dir)
 
 # Try to load the dataset class directly from specific files
-try:
-    from datasets import SpectrogramDatasetWithMaterial
-    print("Successfully imported SpectrogramDatasetWithMaterial from datasets.py")
-except ImportError:
-    print("Could not find SpectrogramDatasetWithMaterial class.")
-    sys.exit(1)
 
-from config import SAVE_DIR
+
+from angle_classification_deg6.config import SAVE_DIR
 
 def extract_features_from_dataloader(dataloader):
     """Extract features and labels from a dataloader"""
@@ -151,7 +153,7 @@ def main():
         print("Loading datasets...")
         
         # Create train and test datasets
-        from config import DATA_ROOT, CLASSES, SEQ_NUMS, MATERIAL
+        from angle_classification_deg6.config import DATA_ROOT, CLASSES, SEQ_NUMS, MATERIAL
         
         # Get training and testing sequences
         train_seqs = SEQ_NUMS[:7]  # first 7 sequences for training

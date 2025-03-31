@@ -11,7 +11,7 @@ from sklearn.manifold import TSNE
 from sklearn.datasets import make_blobs, make_circles, make_moons, make_swiss_roll
 import time
 
-from config import SAVE_DIR
+from angle_classification_deg6.config import SAVE_DIR
 
 def generate_data(dataset_type='blobs', n_samples=1000, random_state=42):
     """Generate synthetic datasets"""

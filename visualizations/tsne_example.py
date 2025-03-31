@@ -16,7 +16,16 @@ from matplotlib.colors import ListedColormap
 import time
 import sys
 
-from config import SAVE_DIR
+# IMPORT_CONFIG_COMPLETE
+# Add the parent directory to the Python path
+import os
+import sys
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+# Import from parent directory
+from angle_classification_deg6.config import SAVE_DIR
 
 def generate_data(dataset_type='blobs', n_samples=1000, random_state=42):
     """Generate various synthetic datasets"""

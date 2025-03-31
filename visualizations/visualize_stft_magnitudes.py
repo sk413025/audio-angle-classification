@@ -18,32 +18,16 @@ matplotlib.use('Agg')  # Set backend
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 import sys
 
-# Add current directory to path to ensure modules can be found
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# IMPORT_CONFIG_COMPLETE
+# Add the parent directory to the Python path
+import os
+import sys
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
-# Try different import approaches
-try:
-    # Method 1: Import from angle_classification_deg6 subdirectory
-    from angle_classification_deg6.datasets import SpectrogramDatasetWithMaterial
-    from angle_classification_deg6 import config
-    print("Successfully imported modules from angle classification subdirectory")
-except ImportError:
-    try:
-        # Method 2: Assume files are in current directory
-        from datasets import SpectrogramDatasetWithMaterial
-        import config
-        print("Successfully imported modules from current directory")
-    except ImportError:
-        # Method 3: Try importing from parent directory
-        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        try:
-            from datasets import SpectrogramDatasetWithMaterial
-            import config
-            print("Successfully imported modules from parent directory")
-        except ImportError:
-            print("Could not find required modules. Please check file paths.")
-            print("Please place datasets.py and config.py in the same directory as this script, or adjust the paths.")
-            sys.exit(1)
+# Import from parent directory
+
 
 def get_angle_from_class(class_name):
     """Extract angle value from class name"""
