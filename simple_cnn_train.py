@@ -1,8 +1,8 @@
 """
-簡單CNN模型訓練腳本
+ResNet18模型訓練腳本
 功能：
 - 實現頻譜圖數據加載與預處理
-- 配置並訓練CNN模型
+- 配置並訓練ResNet18模型
 - 保存訓練好的模型
 - 評估模型性能
 """
@@ -15,21 +15,22 @@ from torch.utils.data import DataLoader
 from datetime import datetime
 
 from datasets import SpectrogramDatasetWithMaterial, RankingPairDataset
-# from simple_cnn_models import SimpleCNNAudioRanker
-# from simple_cnn_models_native import SimpleCNNAudioRanker
-from convnext_models import ConvNeXtAudioRanker as SimpleCNNAudioRanker
+# from simple_cnn_models import ResNetAudioRanker
+# from simple_cnn_models_native import SimpleCNNAudioRanker as ResNetAudioRanker
+from convnext_models import ConvNeXtAudioRanker as ResNetAudioRanker
+
 import config
 
 def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
     """
-    訓練簡單CNN模型進行角度分類
+    訓練ResNet18模型進行角度分類
 
     參數:
         frequency: 使用的頻率數據
         material: 使用的材質
         selected_seqs: 選擇的序列編號
     """
-    print(f"開始訓練CNN模型 - 頻率: {frequency}, 材質: {material}")
+    print(f"開始訓練ResNet18模型 - 頻率: {frequency}, 材質: {material}")
     
     # 設置裝置
     device = config.DEVICE
@@ -49,7 +50,7 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
         return
         
     # 添加訓練集和驗證集分割
-    train_size = int(0.7 * len(dataset))  # 80% 作為訓練集
+    train_size = int(0.7 * len(dataset))  # 70% 作為訓練集
     val_size = len(dataset) - train_size
     
     # 確保訓練集和驗證集都至少有4個樣本（允許最小批次大小為2）
@@ -77,7 +78,7 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
         batch_size=batch_size,
         shuffle=True,
         num_workers=4,
-        drop_last=True  # 改為 False，不丟棄最後一個不完整的批次
+        drop_last=True
     )
     
     val_dataloader = DataLoader(
@@ -85,7 +86,7 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
         batch_size=batch_size,
         shuffle=False,
         num_workers=4,
-        drop_last=True  # 改為 False，不丟棄最後一個不完整的批次
+        drop_last=True
     )
     
     # 檢查數據加載器是否為空
@@ -103,7 +104,7 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
     print(f"使用的批次大小: {batch_size}")
 
     # 初始化模型
-    model = SimpleCNNAudioRanker(n_freqs=dataset.data.shape[2] if dataset.data is not None else None)
+    model = ResNetAudioRanker(n_freqs=dataset.data.shape[2] if dataset.data is not None else None)
     model.to(device)
     
     # 打印模型信息
@@ -148,7 +149,6 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
         for i, (data1, data2, targets, label1, label2) in enumerate(train_dataloader):
             data1, data2 = data1.to(device), data2.to(device)
             targets = targets.to(device)
-            # print("batch_size : ", data1.shape)
             
             # 清除梯度
             optimizer.zero_grad()
@@ -229,14 +229,14 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
         print(f"Validation - Loss: {val_loss:.4f}, Accuracy: {val_accuracy:.2f}%")
         
         # 使用驗證損失來更新學習率調度器
-        scheduler.step(val_loss)
+        # scheduler.step(val_loss)
         
         # 使用驗證損失來保存最佳模型
         if val_loss < best_loss:
             best_loss = val_loss
             model_path = os.path.join(
                 config.SAVE_DIR,
-                f"simple_cnn_{material}_{frequency}_best_{timestamp}.pt"
+                f"resnet18_{material}_{frequency}_best_{timestamp}.pt"
             )
             torch.save({
                 'epoch': epoch + 1,

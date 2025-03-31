@@ -171,7 +171,7 @@ class RankingPairDataset(Dataset):
         # 隨機生成樣本對
         for _ in range(n_pairs):
             # 隨機選擇兩個不同的樣本
-            sample1, sample2 = np.random.choice(len(all_data), 2, replace=True)
+            sample1, sample2 = np.random.choice(len(all_data), 2, replace=False)
             idx1, label1 = all_data[sample1]
             idx2, label2 = all_data[sample2]
             

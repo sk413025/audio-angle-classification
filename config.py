@@ -22,7 +22,7 @@ SAMPLE_RATE = 48000
 DATA_ROOT = "/Users/sbplab/Hank/20250211-方向性/step_036_sliced"  # 修改為正確的資料夾名稱
 CLASSES = ["deg000", "deg036", "deg072", "deg108", "deg144", "deg180"]
 # FREQUENCIES = ["500hz", "1000hz", "3000hz"]
-FREQUENCIES = ["3000hz"]
+FREQUENCIES = ["500hz"]
 
 SEQ_NUMS = ["00", "01", "02" ,"03" ,"04","05","06","07","08"]
 # 新增材質類型
@@ -31,7 +31,7 @@ MATERIAL = "plastic"  # 預設使用的材質
 
 # 訓練相關常量
 BATCH_SIZE = 4
-NUM_EPOCHS = 20
+NUM_EPOCHS = 100
 LEARNING_RATE = 0.001  # 學習率
 WEIGHT_DECAY = 1e-5  # 權重衰減（正則化）
 MARGIN = 10.0  # 排名邊界值
