@@ -272,22 +272,22 @@ def main():
 
     # Select the latest model file
     latest_model = max(model_files, key=lambda x: os.path.getctime(os.path.join(config.SAVE_DIR, x)))
-    model_path = "/Users/sbplab/Hank/angle_classification_deg6/saved_models/resnet18_plastic_3000hz_best_20250331_181545.pt"
+    model_path = "/Users/sbplab/Hank/angle_classification_deg6/saved_models/resnet18_plastic_1000hz_best_20250401_201457.pt"
     print(f"\nLoading model: {latest_model}")
 
     # Parse frequency and material information from filename
     parts = latest_model.split('_')
     try:
         material = "plastic"
-        frequency = "3000hz"
+        frequency = "1000hz"
     except IndexError:
         print("Error parsing model filename. Using default values.")
         material = "plastic"
-        frequency = "3000hz"
+        frequency = "1000hz"
     
     # Load first dataset (original, 36度間隔)
     dataset1 = SpectrogramDatasetWithMaterial(
-        os.path.join(config.DATA_ROOT, "step_036_sliced"),
+        os.path.join(config.DATA_ROOT, "step_018_sliced"),
         ["deg000", "deg036", "deg072", "deg108", "deg144", "deg180"],
         config.SEQ_NUMS,
         frequency,

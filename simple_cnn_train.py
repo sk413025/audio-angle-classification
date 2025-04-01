@@ -16,8 +16,8 @@ from datetime import datetime
 
 from datasets import SpectrogramDatasetWithMaterial, RankingPairDataset
 # from simple_cnn_models import ResNetAudioRanker
-# from simple_cnn_models_native import SimpleCNNAudioRanker as ResNetAudioRanker
-from convnext_models import ConvNeXtAudioRanker as ResNetAudioRanker
+from simple_cnn_models_native import SimpleCNNAudioRanker as ResNetAudioRanker
+# from convnext_models import ConvNeXtAudioRanker as ResNetAudioRanker
 
 import config
 
@@ -38,8 +38,9 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
     
     # 數據加載
     dataset = SpectrogramDatasetWithMaterial(
-        config.DATA_ROOT,
-        config.CLASSES,
+        os.path.join(config.DATA_ROOT, "step_018_sliced"),
+        # ["deg000", "deg018", "deg036", "deg054", "deg072", "deg090", "deg108", "deg126", "deg144", "deg162", "deg180"],
+        ["deg000", "deg036", "deg072", "deg108", "deg144", "deg180"],
         selected_seqs,
         frequency,
         material
@@ -50,7 +51,7 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
         return
         
     # 添加訓練集和驗證集分割
-    train_size = int(0.7 * len(dataset))  # 70% 作為訓練集
+    train_size = int(0.90 * len(dataset))  # 70% 作為訓練集
     val_size = len(dataset) - train_size
     
     # 確保訓練集和驗證集都至少有4個樣本（允許最小批次大小為2）
@@ -62,7 +63,8 @@ def train_cnn_model(frequency, material, selected_seqs=config.SEQ_NUMS):
     
     # 創建訓練集和驗證集的排序對數據集
     train_ranking_dataset = RankingPairDataset(train_dataset)
-    val_ranking_dataset = RankingPairDataset(val_dataset)
+    # val_ranking_dataset = RankingPairDataset(val_dataset)
+    val_ranking_dataset = RankingPairDataset(train_dataset)
     
     # 分別創建訓練和驗證數據加載器
     # 修改批次大小的計算方式
