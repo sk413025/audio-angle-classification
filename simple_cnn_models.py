@@ -63,14 +63,14 @@ class SpectrogramAdapter(nn.Module):
         x_grad_norm = (x_grad - torch.min(x_grad)) / (torch.max(x_grad) - torch.min(x_grad) + 1e-5)
         x_rgb[:, 2:3, :, :] = x_grad_norm
         
-        # # 4. 將數據調整為ImageNet的分佈範圍
-        # # 首先確保x_rgb設備與self.imagenet_mean設備相同
-        # device = x_rgb.device
-        # imagenet_mean = self.imagenet_mean.to(device)
-        # imagenet_std = self.imagenet_std.to(device)
+        # 4. 將數據調整為ImageNet的分佈範圍
+        # 首先確保x_rgb設備與self.imagenet_mean設備相同
+        device = x_rgb.device
+        imagenet_mean = self.imagenet_mean.to(device)
+        imagenet_std = self.imagenet_std.to(device)
         
-        # # 將[0,1]範圍映射到ImageNet分佈
-        # x_rgb = (x_rgb - 0.5) * 2  # 先映射到[-1,1]
+        # 將[0,1]範圍映射到ImageNet分佈
+        x_rgb = (x_rgb - 0.5) * 2  # 先映射到[-1,1]
         # x_rgb = x_rgb * imagenet_std + imagenet_mean  # 再映射到ImageNet分佈
         
         return x_rgb
