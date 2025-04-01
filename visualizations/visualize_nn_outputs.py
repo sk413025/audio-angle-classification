@@ -18,13 +18,16 @@ matplotlib.use('Agg')  # Set backend
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 import sys
 
-# IMPORT_CONFIG_COMPLETE
 # Add the parent directory to the Python path
-import os
-import sys
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
+
+# Import required modules
+import config
+from datasets import SpectrogramDatasetWithMaterial
+# from simple_cnn_models import ResNetAudioRanker
+from simple_cnn_models_native import SimpleCNNAudioRanker as ResNetAudioRanker
 
 # Try different import approaches
 
@@ -197,83 +200,132 @@ def plot_output_histogram(outputs, save_path):
     plt.close()
     print(f"Output histogram saved to: {save_path}")
 
+def plot_multi_angle_comparison(outputs1, angles1, outputs2, angles2, material1, material2, frequency, save_path):
+    """Create a scatter plot comparing two datasets with different angle intervals"""
+    plt.figure(figsize=(12, 8))
+    
+    # 為兩個數據集使用不同的標記和顏色
+    plt.scatter(angles1, outputs1, alpha=0.7, s=100, marker='o', 
+               label=f'{material1} (36° intervals)', c='#1f77b4')
+    plt.scatter(angles2, outputs2, alpha=0.7, s=80, marker='^', 
+               label=f'{material2} (18° intervals)', c='#ff7f0e')
+    
+    # 為每個數據集添加趨勢線
+    z1 = np.polyfit(angles1, outputs1, 1)
+    p1 = np.poly1d(z1)
+    plt.plot(sorted(np.unique(angles1)), p1(sorted(np.unique(angles1))), 
+             '--', color='#1f77b4', linewidth=2, 
+             label=f'{material1} trend: y={z1[0]:.4f}x+{z1[1]:.4f}')
+    
+    z2 = np.polyfit(angles2, outputs2, 1)
+    p2 = np.poly1d(z2)
+    plt.plot(sorted(np.unique(angles2)), p2(sorted(np.unique(angles2))), 
+             '--', color='#ff7f0e', linewidth=2, 
+             label=f'{material2} trend: y={z2[0]:.4f}x+{z2[1]:.4f}')
+    
+    # 添加垂直線標記角度間隔 (可選)
+    # angle_range = np.arange(0, 181, 36)
+    # for angle in angle_range:
+    #    plt.axvline(x=angle, color='#1f77b4', alpha=0.1, linestyle='-')
+    
+    # angle_range_2 = np.arange(0, 181, 18)
+    # for angle in angle_range_2:
+    #    plt.axvline(x=angle, color='#ff7f0e', alpha=0.1, linestyle=':')
+    
+    plt.title(f'Network Output Values vs. Angle Comparison\n{frequency}', fontsize=16)
+    plt.xlabel('Angle (degrees)', fontsize=14)
+    plt.ylabel('Network Output Value', fontsize=14)
+    plt.grid(True, alpha=0.3)
+    
+    # 調整x軸範圍
+    plt.xlim(-5, 185)
+    
+    # 添加統計信息到圖表內部
+    stats_text = f"{material1}: μ={np.mean(outputs1):.2f}, σ={np.std(outputs1):.2f}\n{material2}: μ={np.mean(outputs2):.2f}, σ={np.std(outputs2):.2f}"
+    plt.text(0.02, 0.02, stats_text, transform=plt.gca().transAxes, 
+            bbox=dict(facecolor='white', alpha=0.8), fontsize=10)
+    
+    # 調整圖例位置
+    plt.legend(loc='upper right', fontsize=10)
+    
+    # 設置x軸刻度
+    major_ticks = np.arange(0, 181, 36)
+    minor_ticks = np.arange(0, 181, 18)
+    plt.gca().set_xticks(major_ticks)
+    plt.gca().set_xticks(minor_ticks, minor=True)
+    
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300)
+    plt.close()
+    print(f"Comparison plot saved to: {save_path}")
+
 def main():
     print("Starting Neural Network Output visualization process...")
-    device = config.DEVICE
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
-    
-    # Let user select frequency
-    available_frequencies = ['500hz', '1000hz', '3000hz']
-    print("\nAvailable frequencies:")
-    for i, freq in enumerate(available_frequencies):
-        print(f"{i+1}. {freq}")
-    
-    while True:
-        try:
-            choice = int(input("\nSelect frequency (1-3): "))
-            if 1 <= choice <= 3:
-                selected_freq = available_frequencies[choice-1]
-                break
-            else:
-                print("Invalid choice, please enter a number between 1-3")
-        except ValueError:
-            print("Please enter a valid number")
-    
-    # Get latest model file for the specified frequency
-    model_files = [
-        f for f in os.listdir(config.SAVE_DIR) 
-        if f.startswith('resnet18_') 
-        and selected_freq in f 
-        and f.endswith('.pt')
-    ]
-    
+
+    # Get latest model file
+    model_files = [f for f in os.listdir(config.SAVE_DIR) if f.startswith('simple_cnn_') and f.endswith('.pt')]
     if not model_files:
-        print(f"Could not find model files for frequency {selected_freq}!")
+        print("Could not find model files!")
         return
-    
+
     # Select the latest model file
     latest_model = max(model_files, key=lambda x: os.path.getctime(os.path.join(config.SAVE_DIR, x)))
-    model_path = os.path.join(config.SAVE_DIR, latest_model)
-    
+    model_path = "/Users/sbplab/Hank/angle_classification_deg6/saved_models/resnet18_plastic_3000hz_best_20250331_181545.pt"
     print(f"\nLoading model: {latest_model}")
-    
+
     # Parse frequency and material information from filename
     parts = latest_model.split('_')
     try:
-        # material = parts[2]
-        # frequency = parts[3]
         material = "plastic"
-        frequency = "500hz"
+        frequency = "3000hz"
     except IndexError:
         print("Error parsing model filename. Using default values.")
-        material = "unknown"
-        frequency = "unknown"
+        material = "plastic"
+        frequency = "3000hz"
     
-    # Load dataset
-    # import ipdb; ipdb.set_trace()
-    dataset = SpectrogramDatasetWithMaterial(
-        config.DATA_ROOT,
-        config.CLASSES,
+    # Load first dataset (original, 36度間隔)
+    dataset1 = SpectrogramDatasetWithMaterial(
+        os.path.join(config.DATA_ROOT, "step_036_sliced"),
+        ["deg000", "deg036", "deg072", "deg108", "deg144", "deg180"],
         config.SEQ_NUMS,
         frequency,
         material
     )
     
-    if len(dataset) == 0:
-        print("Dataset is empty!")
+    if len(dataset1) == 0:
+        print("First dataset is empty!")
         return
     
-    print(f"Dataset loaded with {len(dataset)} samples")
+    print(f"First dataset loaded with {len(dataset1)} samples")
+
+    # Load second dataset (18度間隔)
+    second_material = "plastic"
+    
+    dataset2 = SpectrogramDatasetWithMaterial(
+        os.path.join(config.DATA_ROOT, "step_018_sliced"),
+        ["deg000", "deg018", "deg036", "deg054", "deg072", "deg090", "deg108", "deg126", "deg144", "deg162", "deg180"],
+        config.SEQ_NUMS,
+        frequency,
+        material
+    )
+    
+    if len(dataset2) == 0:
+        print("Second dataset is empty!")
+        return
+    
+    print(f"Second dataset loaded with {len(dataset2)} samples")
     
     # Load model
-    model = SimpleCNNAudioRanker(n_freqs=dataset.data.shape[2])
-    # model = ResNetAudioRanker(n_freqs=dataset.data.shape[2])
+    model = ResNetAudioRanker(n_freqs=dataset1.data.shape[2])
     checkpoint = torch.load(model_path, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
     
     print("Extracting network output values...")
-    outputs, labels, angles = extract_nn_outputs(model, dataset, device)
+    outputs1, labels1, angles1 = extract_nn_outputs(model, dataset1, device)
+    outputs2, labels2, angles2 = extract_nn_outputs(model, dataset2, device)
     
     # Create save directory
     plots_dir = os.path.join(config.SAVE_DIR, 'nn_output_plots')
@@ -282,24 +334,14 @@ def main():
     # Generate visualizations
     print("Generating visualization charts...")
     
-    # 1. Output by angle violin plot
-    # violin_path = os.path.join(plots_dir, f'output_by_angle_{material}_{frequency}.png')
-    # plot_outputs_by_angle(outputs, angles, violin_path)
-    
-    # # 2. Output distribution heatmap
-    # heatmap_path = os.path.join(plots_dir, f'output_heatmap_{material}_{frequency}.png')
-    # plot_output_heatmap(outputs, angles, heatmap_path)
-    
-    # # 3. Angle vs. output scatter plot
-    scatter_path = os.path.join(plots_dir, f'angle_vs_output_{material}_{frequency}.png')
-    plot_angle_vs_output_scatter(outputs, angles, scatter_path)
-    
-    # # 4. Output histogram
-    # hist_path = os.path.join(plots_dir, f'output_histogram_{material}_{frequency}.png')
-    # plot_output_histogram(outputs, hist_path)
+    # 使用新的視覺化函數
+    scatter_path = os.path.join(plots_dir, f'angle_vs_output_comparison_{material}_{second_material}_{frequency}.png')
+    plot_multi_angle_comparison(outputs1, angles1, outputs2, angles2, 
+                              material, second_material, frequency, scatter_path)
     
     print("\nVisualization complete! Charts saved to:", plots_dir)
-    print(f"Processed {len(outputs)} data points")
+    print(f"Processed {len(outputs1)} data points from first dataset (36° intervals)")
+    print(f"Processed {len(outputs2)} data points from second dataset (18° intervals)")
 
 if __name__ == "__main__":
     try:

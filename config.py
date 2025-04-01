@@ -19,7 +19,7 @@ SAMPLE_RATE = 48000
 
 # 數據路徑和分類
 # 修改為適用於 macOS 的正確路徑格式
-DATA_ROOT = "/Users/sbplab/Hank/20250211-方向性/step_036_sliced"  # 修改為正確的資料夾名稱
+DATA_ROOT = "/Users/sbplab/Hank/sinetone_sliced/"  # 修改為正確的資料夾名稱
 CLASSES = ["deg000", "deg036", "deg072", "deg108", "deg144", "deg180"]
 # FREQUENCIES = ["500hz", "1000hz", "3000hz"]
 FREQUENCIES = ["500hz"]
