@@ -26,8 +26,8 @@ if parent_dir not in sys.path:
 # Import required modules
 import config
 from datasets import SpectrogramDatasetWithMaterial
-# from simple_cnn_models import ResNetAudioRanker
-from simple_cnn_models_native import SimpleCNNAudioRanker as ResNetAudioRanker
+from simple_cnn_models import ResNetAudioRanker
+# from simple_cnn_models_native import SimpleCNNAudioRanker as ResNetAudioRanker
 
 # Try different import approaches
 
@@ -272,7 +272,8 @@ def main():
 
     # Select the latest model file
     latest_model = max(model_files, key=lambda x: os.path.getctime(os.path.join(config.SAVE_DIR, x)))
-    model_path = "/Users/sbplab/Hank/angle_classification_deg6/saved_models/resnet18_plastic_1000hz_best_20250401_201457.pt"
+    # model_path = "/Users/sbplab/Hank/angle_classification_deg6/saved_models/resnet18_plastic_1000hz_best_20250401_201457.pt"
+    model_path = "/Users/sbplab/Hank/angle_classification_deg6/saved_models/resnet18_plastic_1000hz_best_20250401_203429.pt"
     print(f"\nLoading model: {latest_model}")
 
     # Parse frequency and material information from filename

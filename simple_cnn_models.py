@@ -66,8 +66,8 @@ class SpectrogramAdapter(nn.Module):
         # 4. 將數據調整為ImageNet的分佈範圍
         # 首先確保x_rgb設備與self.imagenet_mean設備相同
         device = x_rgb.device
-        imagenet_mean = self.imagenet_mean.to(device)
-        imagenet_std = self.imagenet_std.to(device)
+        # imagenet_mean = self.imagenet_mean.to(device)
+        # imagenet_std = self.imagenet_std.to(device)
         
         # 將[0,1]範圍映射到ImageNet分佈
         x_rgb = (x_rgb - 0.5) * 2  # 先映射到[-1,1]

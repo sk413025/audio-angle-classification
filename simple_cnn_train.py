@@ -15,8 +15,8 @@ from torch.utils.data import DataLoader
 from datetime import datetime
 
 from datasets import SpectrogramDatasetWithMaterial, RankingPairDataset
-# from simple_cnn_models import ResNetAudioRanker
-from simple_cnn_models_native import SimpleCNNAudioRanker as ResNetAudioRanker
+from simple_cnn_models import ResNetAudioRanker
+# from simple_cnn_models_native import SimpleCNNAudioRanker as ResNetAudioRanker
 # from convnext_models import ConvNeXtAudioRanker as ResNetAudioRanker
 
 import config
