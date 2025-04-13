@@ -14,7 +14,6 @@ from torch.utils.data import DataLoader, random_split
 from datetime import datetime
 import numpy as np
 import pickle
-import matplotlib.pyplot as plt
 
 import config
 from datasets import SpectrogramDatasetWithMaterial, RankingPairDataset
@@ -30,6 +29,9 @@ from losses.ghm_loss import GHMRankingLoss
 from utils.common_utils import worker_init_fn, set_seed
 from utils import ghm_utils
 from utils.debugging_utils import verify_batch_consistency # Import the function
+
+# Import visualization modules
+from utils.visualization import plot_training_history, plot_ghm_statistics
 
 def parse_arguments():
     """Parses command-line arguments for the training script.
@@ -281,16 +283,11 @@ def train_model(args):
 
             # GHM statistics (conditional)
             if args.loss_type == 'ghm' and (i == 0 or i == len(train_dataloader) - 1):
-                # Ensure criterion passed is the GHMRankingLoss instance
-                stats = ghm_utils.calculate_ghm_statistics(
+                # Use the visualization module to plot GHM statistics
+                plot_ghm_statistics(
                     criterion, outputs1, outputs2, targets,
                     save_dir=stats_dir, 
                     name=f'epoch{epoch+1}_batch{i}_{timestamp}'
-                )
-                ghm_utils.plot_gradient_distribution(
-                    criterion,
-                    save_dir=plots_dir, # Save GHM plots in the main plots dir
-                    name=f'grad_dist_epoch{epoch+1}_batch{i}_{timestamp}'
                 )
 
         # Validation phase
@@ -366,38 +363,10 @@ def train_model(args):
 
     # --- End of Training Loop ---
 
-    # Plotting training history
-    plt.figure(figsize=(12, 10))
-
-    # Loss plot
-    plt.subplot(2, 1, 1)
-    plt.plot(training_history['epoch'], training_history['train_loss_main'], 'b-', label=f'Train Loss ({args.loss_type})')
-    plt.plot(training_history['epoch'], training_history['val_loss_main'], 'r-', label=f'Val Loss ({args.loss_type})')
-    # Optionally plot standard loss if GHM was used
-    if args.loss_type == 'ghm':
-         plt.plot(training_history['epoch'], training_history['train_loss_standard_log'], 'c--', label='Train Loss (Standard Log)')
-         plt.plot(training_history['epoch'], training_history['val_loss_standard_log'], 'm--', label='Val Loss (Standard Log)')
-    plt.grid(True)
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.title(f'Training and Validation Loss ({args.frequency} / {args.material})')
-
-    # Accuracy plot
-    plt.subplot(2, 1, 2)
-    plt.plot(training_history['epoch'], training_history['train_accuracy'], 'b-', label='Train Accuracy')
-    plt.plot(training_history['epoch'], training_history['val_accuracy'], 'r-', label='Val Accuracy')
-    plt.grid(True)
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy (%)')
-    plt.legend()
-    plt.title(f'Training and Validation Accuracy ({args.frequency} / {args.material})')
-
-    plt.tight_layout()
+    # Plot training history using the visualization module
     plot_path = os.path.join(plots_dir, f'training_history_{timestamp}.png')
-    plt.savefig(plot_path)
+    plot_training_history(training_history, plot_path)
     print(f"Training history plot saved to: {plot_path}")
-    plt.close() # Close plot to free memory
 
     # Save training history dictionary
     history_path = os.path.join(checkpoint_dir, f"training_history_{timestamp}.pkl") # Changed to pkl
