@@ -1,0 +1,315 @@
+
+--- Training Frequency: 3000hz ---
+Using random seed: 42
+Starting training - Frequency: 3000hz, Material: plastic
+Loss type: ghm
+GHM Params: bins=10, alpha=0.75, margin=10.0
+Using device: mps
+Loading Dataset for 3000hz with material plastic
+Loading Dataset for 3000hz with material plastic
+
+Class deg000 (label 0):
+Found 9 files for class deg000
+
+Class deg036 (label 1):
+Found 9 files for class deg036
+
+Class deg072 (label 2):
+Found 9 files for class deg072
+
+Class deg108 (label 3):
+Found 9 files for class deg108
+
+Class deg144 (label 4):
+Found 9 files for class deg144
+
+Class deg180 (label 5):
+Found 9 files for class deg180
+
+Spectrograms shape: torch.Size([54, 1, 1025, 1126])
+Frequency range: 0.0-24000.0 Hz
+Created 1118 ranking pairs
+Created 230 ranking pairs
+Train ranking pairs: 1118
+Validation ranking pairs: 230
+Using batch size: 32
+
+===== Epoch 1/30 =====
+Batch 10/34 | Main Loss: 1.6800 | Std Loss (log): 9.3420
+Batch 20/34 | Main Loss: 1.8975 | Std Loss (log): 8.2303
+Batch 30/34 | Main Loss: 1.5144 | Std Loss (log): 9.7446
+Epoch 1 Summary
+  Training   - Main Loss: 1.4336, Std Loss (log): 8.9439, Accuracy: 57.26%
+  Validation - Main Loss: 2.0331, Std Loss (log): 10.7049, Accuracy: 48.21%
+  Current learning rate: 0.030000
+
+===== Epoch 2/30 =====
+Batch 10/34 | Main Loss: 1.0356 | Std Loss (log): 5.6511
+Batch 20/34 | Main Loss: 1.6290 | Std Loss (log): 6.9195
+Batch 30/34 | Main Loss: 1.6468 | Std Loss (log): 10.4032
+Epoch 2 Summary
+  Training   - Main Loss: 1.4862, Std Loss (log): 7.5595, Accuracy: 69.12%
+  Validation - Main Loss: 1.9239, Std Loss (log): 10.2773, Accuracy: 48.21%
+  Current learning rate: 0.030000
+
+===== Epoch 3/30 =====
+Batch 10/34 | Main Loss: 1.1712 | Std Loss (log): 7.5286
+Batch 20/34 | Main Loss: 1.2894 | Std Loss (log): 5.4844
+Batch 30/34 | Main Loss: 1.3612 | Std Loss (log): 6.3936
+Epoch 3 Summary
+  Training   - Main Loss: 1.5030, Std Loss (log): 6.9319, Accuracy: 72.43%
+  Validation - Main Loss: 1.7654, Std Loss (log): 10.3932, Accuracy: 51.34%
+  Current learning rate: 0.030000
+
+===== Epoch 4/30 =====
+Batch 10/34 | Main Loss: 1.1274 | Std Loss (log): 7.5024
+Batch 20/34 | Main Loss: 1.3859 | Std Loss (log): 5.4683
+Batch 30/34 | Main Loss: 1.3424 | Std Loss (log): 5.3446
+Epoch 4 Summary
+  Training   - Main Loss: 1.7336, Std Loss (log): 6.9333, Accuracy: 72.43%
+  Validation - Main Loss: 3.0678, Std Loss (log): 11.4800, Accuracy: 54.46%
+  Current learning rate: 0.030000
+
+===== Epoch 5/30 =====
+Batch 10/34 | Main Loss: 1.4184 | Std Loss (log): 7.0969
+Batch 20/34 | Main Loss: 1.6905 | Std Loss (log): 7.4248
+Batch 30/34 | Main Loss: 1.1986 | Std Loss (log): 5.7487
+Epoch 5 Summary
+  Training   - Main Loss: 1.5266, Std Loss (log): 6.5928, Accuracy: 73.35%
+  Validation - Main Loss: 2.5052, Std Loss (log): 10.9986, Accuracy: 46.43%
+  Current learning rate: 0.030000
+Model checkpoint saved to: /Users/sbplab/Hank/angle_classification_deg6/saved_models/model_checkpoints/plastic_3000hz_ghm_20250414_141108/model_epoch_5.pt
+
+===== Epoch 6/30 =====
+Batch 10/34 | Main Loss: 1.1302 | Std Loss (log): 5.7832
+Batch 20/34 | Main Loss: 0.8098 | Std Loss (log): 5.4251
+Batch 30/34 | Main Loss: 2.4489 | Std Loss (log): 8.2261
+Epoch 6 Summary
+  Training   - Main Loss: 1.5754, Std Loss (log): 6.3809, Accuracy: 74.17%
+  Validation - Main Loss: 1.9818, Std Loss (log): 10.0771, Accuracy: 52.23%
+  Current learning rate: 0.030000
+
+===== Epoch 7/30 =====
+Batch 10/34 | Main Loss: 1.8966 | Std Loss (log): 9.0110
+Batch 20/34 | Main Loss: 0.9600 | Std Loss (log): 6.4643
+Batch 30/34 | Main Loss: 2.1931 | Std Loss (log): 4.7400
+Epoch 7 Summary
+  Training   - Main Loss: 1.6337, Std Loss (log): 6.3069, Accuracy: 73.25%
+  Validation - Main Loss: 1.7658, Std Loss (log): 10.0109, Accuracy: 52.68%
+  Current learning rate: 0.015000
+
+===== Epoch 8/30 =====
+Batch 10/34 | Main Loss: 1.2284 | Std Loss (log): 5.1781
+Batch 20/34 | Main Loss: 1.3203 | Std Loss (log): 6.4791
+Batch 30/34 | Main Loss: 1.4306 | Std Loss (log): 6.0875
+Epoch 8 Summary
+  Training   - Main Loss: 1.5606, Std Loss (log): 6.1977, Accuracy: 74.36%
+  Validation - Main Loss: 1.7790, Std Loss (log): 10.2396, Accuracy: 54.46%
+  Current learning rate: 0.015000
+
+===== Epoch 9/30 =====
+Batch 10/34 | Main Loss: 1.2417 | Std Loss (log): 5.8281
+Batch 20/34 | Main Loss: 1.1739 | Std Loss (log): 6.1791
+Batch 30/34 | Main Loss: 1.2258 | Std Loss (log): 5.4565
+Epoch 9 Summary
+  Training   - Main Loss: 1.3919, Std Loss (log): 5.4795, Accuracy: 78.12%
+  Validation - Main Loss: 6.0028, Std Loss (log): 13.5959, Accuracy: 47.77%
+  Current learning rate: 0.015000
+
+===== Epoch 10/30 =====
+Batch 10/34 | Main Loss: 1.2771 | Std Loss (log): 4.7916
+Batch 20/34 | Main Loss: 0.7450 | Std Loss (log): 5.7515
+Batch 30/34 | Main Loss: 0.7090 | Std Loss (log): 3.6083
+Epoch 10 Summary
+  Training   - Main Loss: 1.2709, Std Loss (log): 5.1578, Accuracy: 79.50%
+  Validation - Main Loss: 2.0047, Std Loss (log): 11.5069, Accuracy: 44.20%
+  Current learning rate: 0.015000
+Model checkpoint saved to: /Users/sbplab/Hank/angle_classification_deg6/saved_models/model_checkpoints/plastic_3000hz_ghm_20250414_141108/model_epoch_10.pt
+
+===== Epoch 11/30 =====
+Batch 10/34 | Main Loss: 1.6912 | Std Loss (log): 5.4627
+Batch 20/34 | Main Loss: 0.8955 | Std Loss (log): 3.4744
+Batch 30/34 | Main Loss: 1.2336 | Std Loss (log): 5.9553
+Epoch 11 Summary
+  Training   - Main Loss: 1.3435, Std Loss (log): 5.1647, Accuracy: 79.50%
+  Validation - Main Loss: 6.0241, Std Loss (log): 16.9632, Accuracy: 45.54%
+  Current learning rate: 0.007500
+
+===== Epoch 12/30 =====
+Batch 10/34 | Main Loss: 0.9338 | Std Loss (log): 5.0392
+Batch 20/34 | Main Loss: 1.0273 | Std Loss (log): 4.2808
+Batch 30/34 | Main Loss: 0.8078 | Std Loss (log): 5.2498
+Epoch 12 Summary
+  Training   - Main Loss: 1.3376, Std Loss (log): 5.0115, Accuracy: 79.04%
+  Validation - Main Loss: 3.1229, Std Loss (log): 13.2905, Accuracy: 45.98%
+  Current learning rate: 0.007500
+
+===== Epoch 13/30 =====
+Batch 10/34 | Main Loss: 0.8718 | Std Loss (log): 4.9084
+Batch 20/34 | Main Loss: 0.9021 | Std Loss (log): 3.5824
+Batch 30/34 | Main Loss: 3.1436 | Std Loss (log): 5.4225
+Epoch 13 Summary
+  Training   - Main Loss: 1.4030, Std Loss (log): 4.7357, Accuracy: 80.15%
+  Validation - Main Loss: 5.3010, Std Loss (log): 13.8774, Accuracy: 48.21%
+  Current learning rate: 0.007500
+
+===== Epoch 14/30 =====
+Batch 10/34 | Main Loss: 0.8445 | Std Loss (log): 5.0275
+Batch 20/34 | Main Loss: 1.9381 | Std Loss (log): 5.3959
+Batch 30/34 | Main Loss: 0.9780 | Std Loss (log): 5.4513
+Epoch 14 Summary
+  Training   - Main Loss: 1.2877, Std Loss (log): 4.5235, Accuracy: 82.72%
+  Validation - Main Loss: 3.0781, Std Loss (log): 13.9855, Accuracy: 45.54%
+  Current learning rate: 0.007500
+
+===== Epoch 15/30 =====
+Batch 10/34 | Main Loss: 0.8053 | Std Loss (log): 2.9758
+Batch 20/34 | Main Loss: 1.0110 | Std Loss (log): 3.7896
+Batch 30/34 | Main Loss: 0.6409 | Std Loss (log): 4.8850
+Epoch 15 Summary
+  Training   - Main Loss: 1.1807, Std Loss (log): 4.3226, Accuracy: 83.18%
+  Validation - Main Loss: 3.7608, Std Loss (log): 14.0471, Accuracy: 46.88%
+  Current learning rate: 0.003750
+Model checkpoint saved to: /Users/sbplab/Hank/angle_classification_deg6/saved_models/model_checkpoints/plastic_3000hz_ghm_20250414_141108/model_epoch_15.pt
+
+===== Epoch 16/30 =====
+Batch 10/34 | Main Loss: 1.2640 | Std Loss (log): 4.8155
+Batch 20/34 | Main Loss: 0.8835 | Std Loss (log): 5.7155
+Batch 30/34 | Main Loss: 1.2500 | Std Loss (log): 3.6602
+Epoch 16 Summary
+  Training   - Main Loss: 1.1529, Std Loss (log): 3.9488, Accuracy: 83.36%
+  Validation - Main Loss: 3.8968, Std Loss (log): 14.1630, Accuracy: 50.00%
+  Current learning rate: 0.003750
+
+===== Epoch 17/30 =====
+Batch 10/34 | Main Loss: 0.8619 | Std Loss (log): 3.9566
+Batch 20/34 | Main Loss: 0.8196 | Std Loss (log): 3.5046
+Batch 30/34 | Main Loss: 1.6694 | Std Loss (log): 4.3249
+Epoch 17 Summary
+  Training   - Main Loss: 1.0755, Std Loss (log): 3.6452, Accuracy: 86.03%
+  Validation - Main Loss: 3.4016, Std Loss (log): 13.6333, Accuracy: 48.66%
+  Current learning rate: 0.003750
+
+===== Epoch 18/30 =====
+Batch 10/34 | Main Loss: 0.7574 | Std Loss (log): 2.7397
+Batch 20/34 | Main Loss: 0.6409 | Std Loss (log): 3.8011
+Batch 30/34 | Main Loss: 0.5175 | Std Loss (log): 1.5389
+Epoch 18 Summary
+  Training   - Main Loss: 1.0641, Std Loss (log): 3.5274, Accuracy: 85.75%
+  Validation - Main Loss: 6.3380, Std Loss (log): 16.8412, Accuracy: 48.21%
+  Current learning rate: 0.003750
+
+===== Epoch 19/30 =====
+Batch 10/34 | Main Loss: 1.8076 | Std Loss (log): 5.7654
+Batch 20/34 | Main Loss: 0.6097 | Std Loss (log): 3.8750
+Batch 30/34 | Main Loss: 0.8165 | Std Loss (log): 3.3284
+Epoch 19 Summary
+  Training   - Main Loss: 1.0990, Std Loss (log): 3.4507, Accuracy: 87.04%
+  Validation - Main Loss: 3.3611, Std Loss (log): 13.4768, Accuracy: 50.45%
+  Current learning rate: 0.001875
+
+===== Epoch 20/30 =====
+Batch 10/34 | Main Loss: 1.0705 | Std Loss (log): 4.5153
+Batch 20/34 | Main Loss: 0.9836 | Std Loss (log): 3.1279
+Batch 30/34 | Main Loss: 0.9852 | Std Loss (log): 4.0205
+Epoch 20 Summary
+  Training   - Main Loss: 0.9595, Std Loss (log): 3.2075, Accuracy: 87.68%
+  Validation - Main Loss: 4.3743, Std Loss (log): 14.9980, Accuracy: 46.43%
+  Current learning rate: 0.001875
+Model checkpoint saved to: /Users/sbplab/Hank/angle_classification_deg6/saved_models/model_checkpoints/plastic_3000hz_ghm_20250414_141108/model_epoch_20.pt
+
+===== Epoch 21/30 =====
+Batch 10/34 | Main Loss: 0.8837 | Std Loss (log): 2.0144
+Batch 20/34 | Main Loss: 0.7984 | Std Loss (log): 2.3321
+Batch 30/34 | Main Loss: 1.1903 | Std Loss (log): 6.2412
+Epoch 21 Summary
+  Training   - Main Loss: 1.0674, Std Loss (log): 3.3467, Accuracy: 86.95%
+  Validation - Main Loss: 6.1539, Std Loss (log): 18.0037, Accuracy: 48.21%
+  Current learning rate: 0.001875
+
+===== Epoch 22/30 =====
+Batch 10/34 | Main Loss: 0.5196 | Std Loss (log): 2.1634
+Batch 20/34 | Main Loss: 0.8459 | Std Loss (log): 3.9597
+Batch 30/34 | Main Loss: 0.5464 | Std Loss (log): 1.1628
+Epoch 22 Summary
+  Training   - Main Loss: 1.0011, Std Loss (log): 3.1811, Accuracy: 87.32%
+  Validation - Main Loss: 6.8807, Std Loss (log): 17.2177, Accuracy: 48.21%
+  Current learning rate: 0.001875
+
+===== Epoch 23/30 =====
+Batch 10/34 | Main Loss: 0.3341 | Std Loss (log): 1.0966
+Batch 20/34 | Main Loss: 1.0621 | Std Loss (log): 2.9019
+Batch 30/34 | Main Loss: 0.7541 | Std Loss (log): 3.0502
+Epoch 23 Summary
+  Training   - Main Loss: 0.9634, Std Loss (log): 2.9839, Accuracy: 88.88%
+  Validation - Main Loss: 4.4731, Std Loss (log): 14.8125, Accuracy: 50.45%
+  Current learning rate: 0.000937
+
+===== Epoch 24/30 =====
+Batch 10/34 | Main Loss: 0.6240 | Std Loss (log): 2.3024
+Batch 20/34 | Main Loss: 1.1174 | Std Loss (log): 4.8014
+Batch 30/34 | Main Loss: 0.4852 | Std Loss (log): 2.1888
+Epoch 24 Summary
+  Training   - Main Loss: 1.0247, Std Loss (log): 2.9349, Accuracy: 89.34%
+  Validation - Main Loss: 4.6972, Std Loss (log): 14.7867, Accuracy: 45.98%
+  Current learning rate: 0.000937
+
+===== Epoch 25/30 =====
+Batch 10/34 | Main Loss: 1.0907 | Std Loss (log): 2.5067
+Batch 20/34 | Main Loss: 1.1896 | Std Loss (log): 2.7653
+Batch 30/34 | Main Loss: 1.2391 | Std Loss (log): 2.4044
+Epoch 25 Summary
+  Training   - Main Loss: 0.9552, Std Loss (log): 2.7969, Accuracy: 90.07%
+  Validation - Main Loss: 5.0238, Std Loss (log): 15.2895, Accuracy: 47.32%
+  Current learning rate: 0.000937
+Model checkpoint saved to: /Users/sbplab/Hank/angle_classification_deg6/saved_models/model_checkpoints/plastic_3000hz_ghm_20250414_141108/model_epoch_25.pt
+
+===== Epoch 26/30 =====
+Batch 10/34 | Main Loss: 1.6856 | Std Loss (log): 4.1590
+Batch 20/34 | Main Loss: 1.5857 | Std Loss (log): 4.1734
+Batch 30/34 | Main Loss: 0.8863 | Std Loss (log): 3.4183
+Epoch 26 Summary
+  Training   - Main Loss: 0.9684, Std Loss (log): 3.0783, Accuracy: 88.24%
+  Validation - Main Loss: 4.8078, Std Loss (log): 15.6547, Accuracy: 45.98%
+  Current learning rate: 0.000937
+
+===== Epoch 27/30 =====
+Batch 10/34 | Main Loss: 1.0280 | Std Loss (log): 3.6092
+Batch 20/34 | Main Loss: 0.3777 | Std Loss (log): 1.5679
+Batch 30/34 | Main Loss: 1.1155 | Std Loss (log): 3.7405
+Epoch 27 Summary
+  Training   - Main Loss: 0.8971, Std Loss (log): 2.9096, Accuracy: 89.80%
+  Validation - Main Loss: 5.4066, Std Loss (log): 16.7223, Accuracy: 49.11%
+  Current learning rate: 0.000469
+
+===== Epoch 28/30 =====
+Batch 10/34 | Main Loss: 0.7765 | Std Loss (log): 2.3572
+Batch 20/34 | Main Loss: 0.5792 | Std Loss (log): 2.1202
+Batch 30/34 | Main Loss: 0.4652 | Std Loss (log): 1.4260
+Epoch 28 Summary
+  Training   - Main Loss: 0.9652, Std Loss (log): 2.7776, Accuracy: 89.34%
+  Validation - Main Loss: 9.2208, Std Loss (log): 18.3026, Accuracy: 44.64%
+  Current learning rate: 0.000469
+
+===== Epoch 29/30 =====
+Batch 10/34 | Main Loss: 0.9788 | Std Loss (log): 2.8065
+Batch 20/34 | Main Loss: 1.2492 | Std Loss (log): 2.7428
+Batch 30/34 | Main Loss: 1.1891 | Std Loss (log): 4.0959
+Epoch 29 Summary
+  Training   - Main Loss: 1.0744, Std Loss (log): 2.9251, Accuracy: 88.69%
+  Validation - Main Loss: 4.6822, Std Loss (log): 15.0428, Accuracy: 45.98%
+  Current learning rate: 0.000469
+
+===== Epoch 30/30 =====
+Batch 10/34 | Main Loss: 0.6513 | Std Loss (log): 2.3279
+Batch 20/34 | Main Loss: 0.8312 | Std Loss (log): 3.0431
+Batch 30/34 | Main Loss: 0.9543 | Std Loss (log): 2.1703
+Epoch 30 Summary
+  Training   - Main Loss: 0.9134, Std Loss (log): 2.5632, Accuracy: 90.35%
+  Validation - Main Loss: 4.9527, Std Loss (log): 17.8178, Accuracy: 44.20%
+  Current learning rate: 0.000469
+Model checkpoint saved to: /Users/sbplab/Hank/angle_classification_deg6/saved_models/model_checkpoints/plastic_3000hz_ghm_20250414_141108/model_epoch_30.pt
+Training history plot saved to: /Users/sbplab/Hank/angle_classification_deg6/saved_models/plots/plastic_3000hz_ghm_20250414_141108/training_history_20250414_141108.png
+Training history saved to: /Users/sbplab/Hank/angle_classification_deg6/saved_models/model_checkpoints/plastic_3000hz_ghm_20250414_141108/training_history_20250414_141108.pkl
+
+--- Finished training 3000hz ---
