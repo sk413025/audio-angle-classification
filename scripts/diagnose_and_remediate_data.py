@@ -669,8 +669,11 @@ def main():
     # 加載或訓練模型
     model = load_or_train_model(args, dataset, device)
     
-    # 計算質量指標
-    quality_metrics = calculate_quality_metrics_for_samples(model, dataset, output_dirs['logs'], args.num_samples, device)
+    # 如果指定了計算質量指標，則計算樣本質量
+    if args.quality_metrics:
+        quality_results = calculate_quality_metrics_for_samples(
+            model, dataset, output_dirs['logs'], args.num_samples, device
+        )
     
     # 診斷問題樣本
     detector = diagnose_problems(model, dataset, args, output_dirs)
