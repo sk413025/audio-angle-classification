@@ -9,3 +9,6 @@
 *.pkl
 
 saved_models/
+
+# Ignore diagnostics results directories
+scripts/diagnostics_results_*/
