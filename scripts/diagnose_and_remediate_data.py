@@ -204,6 +204,201 @@ def load_or_train_model(args, dataset, device):
     model.eval()
     return model
 
+def calculate_quality_metrics_for_samples(model, dataset, output_dir, num_samples=10, device=None):
+    """計算數據集中樣本的質量指標。
+    
+    使用quality_metrics模組中的所有函數來評估樣本質量。
+    
+    Args:
+        model: 已訓練的模型
+        dataset: 數據集
+        output_dir: 輸出目錄
+        num_samples: 要計算指標的樣本數量
+        device: 計算設備
+        
+    Returns:
+        dict: 包含樣本質量指標的字典
+    """
+    print(f"\n=== 使用quality_metrics模組計算樣本質量指標 ===")
+    
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else
+                             "mps" if torch.backends.mps.is_available() else
+                             "cpu")
+    
+    # 隨機選擇樣本
+    indices = np.random.choice(len(dataset), min(num_samples, len(dataset)), replace=False)
+    print(f"選擇了 {len(indices)} 個樣本進行質量評估")
+    
+    # 創建一個小的驗證集用於計算樣本影響力
+    val_indices = np.random.choice(
+        [i for i in range(len(dataset)) if i not in indices],
+        min(20, len(dataset) - len(indices)),
+        replace=False
+    )
+    validation_subset = [(dataset[i][0], dataset[i][1]) for i in val_indices]
+    
+    # 對每個樣本計算質量指標
+    quality_results = {}
+    
+    for i, idx in enumerate(indices):
+        print(f"處理樣本 {i+1}/{len(indices)} (索引: {idx})...")
+        
+        # 獲取樣本數據
+        sample, target = dataset[idx]
+        
+        # 確保數據是tensor格式
+        if not isinstance(sample, torch.Tensor):
+            sample = torch.tensor(sample, dtype=torch.float32)
+        
+        if not isinstance(target, torch.Tensor):
+            target = torch.tensor(target)
+        
+        # 確保有正確的維度 (假設模型期望 N,C,H,W 格式)
+        if len(sample.shape) == 3:  # (C,H,W)
+            sample = sample.unsqueeze(0)  # 添加批次維度: (1,C,H,W)
+        elif len(sample.shape) == 2:  # (H,W)
+            sample = sample.unsqueeze(0).unsqueeze(0)  # 添加通道和批次維度: (1,1,H,W)
+        
+        # 確保標籤有正確的格式
+        if target.dim() == 0:
+            target = target.unsqueeze(0)
+        
+        # 將數據移動到設備上
+        sample = sample.to(device)
+        target = target.to(device)
+        
+        # 計算樣本難度
+        try:
+            difficulty = calculate_sample_difficulty(model, sample, target)
+            print(f"  - 樣本難度: {difficulty:.4f}")
+        except Exception as e:
+            print(f"  - 計算樣本難度時出錯: {e}")
+            difficulty = None
+        
+        # 計算樣本影響力
+        try:
+            # 使用MSE損失函數
+            criterion = torch.nn.MSELoss()
+            
+            # 將驗證集樣本轉換為正確格式
+            processed_validation_set = []
+            for val_sample, val_target in validation_subset:
+                # 確保數據是tensor格式
+                if not isinstance(val_sample, torch.Tensor):
+                    val_sample = torch.tensor(val_sample, dtype=torch.float32)
+                
+                if not isinstance(val_target, torch.Tensor):
+                    val_target = torch.tensor(val_target)
+                
+                # 確保有正確的維度 (假設模型期望 N,C,H,W 格式)
+                if len(val_sample.shape) == 3:  # (C,H,W)
+                    val_sample = val_sample.unsqueeze(0)  # 添加批次維度: (1,C,H,W)
+                elif len(val_sample.shape) == 2:  # (H,W)
+                    val_sample = val_sample.unsqueeze(0).unsqueeze(0)  # 添加通道和批次維度: (1,1,H,W)
+                
+                # 確保標籤有正確的格式
+                if val_target.dim() == 0:
+                    val_target = val_target.unsqueeze(0)
+                
+                processed_validation_set.append((val_sample, val_target))
+            
+            influence = calculate_sample_influence(model, sample, target, processed_validation_set, criterion)
+            print(f"  - 樣本影響力: {influence:.4f}")
+        except Exception as e:
+            print(f"  - 計算樣本影響力時出錯: {e}")
+            influence = None
+        
+        # 計算特徵空間密度
+        try:
+            density = calculate_feature_space_density(model, sample, dataset)
+            print(f"  - 特徵空間密度: {density:.4f}")
+        except Exception as e:
+            print(f"  - 計算特徵空間密度時出錯: {e}")
+            density = None
+        
+        # 計算預測穩定性
+        try:
+            # 定義簡單的數據增強函數
+            def add_noise(x, noise_level=0.05):
+                return x + torch.randn_like(x) * noise_level
+            
+            augmentations = [
+                lambda x: add_noise(x, 0.01),
+                lambda x: add_noise(x, 0.05),
+                lambda x: add_noise(x, 0.1)
+            ]
+            
+            stability = calculate_prediction_stability(model, sample, augmentations)
+            print(f"  - 預測穩定性: {stability:.4f}")
+        except Exception as e:
+            print(f"  - 計算預測穩定性時出錯: {e}")
+            stability = None
+        
+        # 計算損失景觀
+        try:
+            loss_landscape = calculate_loss_landscape(model, sample, target)
+            print(f"  - 損失景觀曲率: {loss_landscape['curvature']:.4f}")
+        except Exception as e:
+            print(f"  - 計算損失景觀時出錯: {e}")
+            loss_landscape = None
+        
+        # 計算綜合質量分數
+        metrics_dict = {
+            'difficulty': difficulty if difficulty is not None else 0.5,
+            'density': density if density is not None else 0.5,
+            'stability': stability if stability is not None else 0.5
+        }
+        
+        if all(v is not None for v in metrics_dict.values()):
+            try:
+                comprehensive_score = calculate_comprehensive_quality_score(metrics_dict)
+                print(f"  - 綜合質量分數: {comprehensive_score:.4f}")
+            except Exception as e:
+                print(f"  - 計算綜合質量分數時出錯: {e}")
+                comprehensive_score = None
+        else:
+            comprehensive_score = None
+        
+        # 存儲結果
+        quality_results[idx] = {
+            'difficulty': difficulty,
+            'influence': influence,
+            'density': density,
+            'stability': stability,
+            'loss_landscape': loss_landscape,
+            'comprehensive_score': comprehensive_score
+        }
+    
+    # 保存結果到文件
+    results_file = os.path.join(output_dir, "quality_metrics_results.json")
+    
+    # 將結果轉換為可JSON序列化的格式
+    json_results = {}
+    for idx, metrics in quality_results.items():
+        json_results[str(idx)] = {}
+        for metric_name, value in metrics.items():
+            if metric_name == 'loss_landscape' and value is not None:
+                # 只保存損失景觀的主要指標
+                json_results[str(idx)][metric_name] = {
+                    'curvature': float(value['curvature']),
+                    'original_loss': float(value['original_loss']),
+                    'min_loss': float(value['min_loss']),
+                    'max_loss': float(value['max_loss']),
+                    'loss_range': float(value['loss_range'])
+                }
+            elif value is not None:
+                json_results[str(idx)][metric_name] = float(value)
+            else:
+                json_results[str(idx)][metric_name] = None
+    
+    with open(results_file, 'w') as f:
+        json.dump(json_results, f, indent=2)
+    
+    print(f"\n質量指標結果已保存到: {results_file}")
+    
+    return quality_results
+
 def diagnose_problems(model, dataset, args, output_dirs):
     """診斷問題樣本。"""
     print("\n=== 開始問題樣本診斷 ===")
@@ -473,6 +668,9 @@ def main():
     
     # 加載或訓練模型
     model = load_or_train_model(args, dataset, device)
+    
+    # 計算質量指標
+    quality_metrics = calculate_quality_metrics_for_samples(model, dataset, output_dirs['logs'], args.num_samples, device)
     
     # 診斷問題樣本
     detector = diagnose_problems(model, dataset, args, output_dirs)
