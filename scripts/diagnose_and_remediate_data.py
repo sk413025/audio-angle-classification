@@ -17,9 +17,10 @@ import sys
 import argparse
 import torch
 import numpy as np
+import json
 from datetime import datetime
 import matplotlib.pyplot as plt
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset
 
 # 添加項目根目錄到Python路徑以確保import正常工作
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -33,7 +34,14 @@ from utils.common_utils import set_seed
 from utils.data_diagnostics import (
     ProblemSampleDetector,
     DiagnosticsVisualizer,
-    RemediationStrategies
+    RemediationStrategies,
+    # 直接導入質量指標函數
+    calculate_sample_difficulty,
+    calculate_sample_influence,
+    calculate_feature_space_density,
+    calculate_prediction_stability,
+    calculate_loss_landscape,
+    calculate_comprehensive_quality_score
 )
 
 def parse_arguments():
@@ -75,6 +83,13 @@ def parse_arguments():
     # 可視化參數
     parser.add_argument('--visualize', action='store_true',
                         help='生成可視化結果')
+    
+    # 質量指標參數
+    parser.add_argument('--quality-metrics', action='store_true',
+                        help='計算樣本質量指標')
+    
+    parser.add_argument('--num-samples', type=int, default=10,
+                        help='要計算質量指標的樣本數量 (默認: 10)')
     
     # 其他參數
     parser.add_argument('--model-path', type=str, default=None,
