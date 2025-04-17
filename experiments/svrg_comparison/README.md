@@ -1,6 +1,6 @@
 # SVRG优化器比较实验
 
-本目录包含了比较SVRG (Stochastic Variance Reduced Gradient) 优化器与标准的Adam优化器在音频角度分类任务上的性能差异的实验代码和结果。
+本目录包含了比较SVRG (Stochastic Variance Reduced Gradient) 优化器与标准的Adam优化器及SGD+Momentum优化器在音频角度分类任务上的性能差异的实验代码和结果。
 
 ## 目录结构
 
@@ -33,6 +33,13 @@ SVRG是一种旨在减少随机梯度方差的优化算法，通过周期性计�
 python -m experiments.svrg_comparison.run_optimizer_comparison [参数]
 ```
 
+或者使用预配置的脚本：
+
+```bash
+# 运行包含SGD+Momentum的完整比较实验
+./experiments/svrg_comparison/run_sgd_comparison.sh
+```
+
 ### 参数说明
 
 - `--frequencies`: 要训练的频率，可选 500hz, 1000hz, 3000hz, all (默认: 全部)
@@ -41,11 +48,14 @@ python -m experiments.svrg_comparison.run_optimizer_comparison [参数]
 - `--batch-size`: 批次大小 (默认: 32)
 - `--learning-rate`: 学习率 (默认: 0.001)
 - `--weight-decay`: 权重衰减 (默认: 0.0001)
+- `--sgd-momentum`: SGD动量系数 (默认: 0.9)
+- `--sgd-nesterov`: 启用Nesterov动量加速
 - `--checkpoint-interval`: 检查点保存间隔 (默认: 5)
 - `--seed`: 随机种子 (默认: 42)
 - `--device`: 计算设备 (cpu, cuda, mps, auto)
 - `--only-standard`: 仅使用标准优化器(Adam)训练
 - `--only-svrg`: 仅使用SVRG优化器训练
+- `--only-sgd`: 仅使用SGD+Momentum优化器训练
 - `--skip-training`: 跳过训练步骤，仅执行评估
 
 ### 示例
@@ -78,12 +88,14 @@ python -m experiments.svrg_comparison.run_optimizer_comparison --only-standard
 基于实验结果，在音频角度分类任务上：
 
 1. Adam优化器在收敛速度、验证准确率和训练稳定性方面整体优于SVRG优化器
-2. 随着频率增加，两种优化器的性能差距有所减小
-3. SVRG由于需要周期性计算全梯度，训练时间较长
+2. SGD+Momentum在训练开始阶段收敛较慢，但最终性能可与Adam相当，有时甚至更佳
+3. 随着频率增加，各优化器的性能差距有所减小
+4. SVRG由于需要周期性计算全梯度，训练时间较长
 
 更多详细分析请参考完整的实验报告。
 
 ## 参考资料
 
 1. Johnson, R., & Zhang, T. (2013). Accelerating stochastic gradient descent using predictive variance reduction. NIPS.
-2. Kingma, D. P., & Ba, J. (2014). Adam: A method for stochastic optimization. arXiv preprint arXiv:1412.6980. 
+2. Kingma, D. P., & Ba, J. (2014). Adam: A method for stochastic optimization. arXiv preprint arXiv:1412.6980.
+3. Sutskever, I., Martens, J., Dahl, G., & Hinton, G. (2013). On the importance of initialization and momentum in deep learning. ICML. 
