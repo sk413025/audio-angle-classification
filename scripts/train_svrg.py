@@ -17,6 +17,7 @@ import sys
 import torch
 import pickle
 from datetime import datetime
+import platform
 
 # Add the root directory to the Python path to ensure imports work correctly
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -74,7 +75,38 @@ def parse_arguments():
     parser.add_argument('--batch-size', type=int, default=32,
                         help='Batch size for training and validation (default: 32).')
     
+    # Device selection
+    parser.add_argument('--device', type=str, default=None, 
+                        choices=['cpu', 'cuda', 'mps', 'auto'],
+                        help='Device to use: cpu, cuda, mps, or auto (default: auto)')
+    
     return parser.parse_args()
+
+def get_device(device_arg):
+    """
+    確定要使用的設備，支援CUDA、MPS（Apple Silicon）和CPU
+    """
+    if device_arg == 'cpu':
+        return torch.device('cpu')
+    
+    if device_arg == 'cuda' and torch.cuda.is_available():
+        return torch.device('cuda')
+    
+    if device_arg == 'mps' and torch.backends.mps.is_available():
+        return torch.device('mps')
+    
+    # Auto device selection
+    if device_arg is None or device_arg == 'auto':
+        if torch.cuda.is_available():
+            return torch.device('cuda')
+        elif torch.backends.mps.is_available():
+            return torch.device('mps')
+        else:
+            return torch.device('cpu')
+    
+    # Fallback to CPU if requested device is not available
+    print(f"Warning: Requested device '{device_arg}' is not available, using CPU instead.")
+    return torch.device('cpu')
 
 def train_with_svrg(args):
     """Trains the model with SVRG optimizer based on the provided arguments."""
@@ -88,9 +120,12 @@ def train_with_svrg(args):
     else:
         print(f"Standard Loss Margin: {args.margin}")
     
-    # Setup device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # Setup device with MPS support for Apple Silicon
+    device = get_device(args.device)
     print(f"Using device: {device}")
+    
+    if device.type == 'mps':
+        print("Using Apple Metal Performance Shaders (MPS) backend")
     
     # Load data
     print(f"Loading Dataset for {args.frequency} with material {args.material}")
@@ -127,11 +162,14 @@ def train_with_svrg(args):
     val_ranking_dataset = RankingPairDataset(val_dataset)
     
     # Create DataLoaders
+    # Note: For MPS compatibility, we might need to adjust num_workers based on the device
+    num_workers = 0 if device.type == 'mps' else 4
+    
     train_dataloader = torch.utils.data.DataLoader(
         train_ranking_dataset,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=4,
+        num_workers=num_workers,
         drop_last=True,
         worker_init_fn=worker_init_fn,
         generator=torch.Generator().manual_seed(args.seed)
@@ -141,7 +179,7 @@ def train_with_svrg(args):
         val_ranking_dataset,
         batch_size=args.batch_size,
         shuffle=False,
-        num_workers=4,
+        num_workers=num_workers,
         drop_last=True,
         worker_init_fn=worker_init_fn,
         generator=torch.Generator().manual_seed(args.seed)
@@ -354,6 +392,12 @@ def train_with_svrg(args):
 def main():
     """Main function to parse arguments and initiate training."""
     args = parse_arguments()
+    
+    # 系統資訊輸出
+    print(f"System: {platform.system()} {platform.version()}")
+    print(f"PyTorch: {torch.__version__}")
+    print(f"CUDA available: {torch.cuda.is_available()}")
+    print(f"MPS available: {torch.backends.mps.is_available()}")
     
     available_frequencies = ['500hz', '1000hz', '3000hz']
     
