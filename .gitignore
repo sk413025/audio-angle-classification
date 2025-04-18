@@ -12,3 +12,4 @@ saved_models/
 
 # Ignore diagnostics results directories
 scripts/diagnostics_results_*/
+experiments/svrg_comparison/results/svrg_comparison_*
