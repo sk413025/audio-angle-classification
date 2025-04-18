@@ -14,9 +14,16 @@ from torch.utils.data import DataLoader, random_split
 from datetime import datetime
 import numpy as np
 import pickle
+import json
 
 import config
-from datasets import SpectrogramDatasetWithMaterial, RankingPairDataset
+from datasets import (
+    AudioSpectrumDataset, 
+    RankingPairDataset, 
+    GHMAwareRankingDataset,
+    SpectrogramDatasetWithMaterial, 
+    DatasetConfig
+)
 # Assuming the model is in models/resnet_ranker.py now or will be moved there
 # We'll use the existing import for now and adjust later if needed.
 from models.resnet_ranker import SimpleCNNAudioRanker as ResNetAudioRanker
@@ -82,6 +89,16 @@ def parse_arguments():
     # Boolean flags
     parser.add_argument('--verify-consistency', action='store_true',
                         help='Verify batch consistency by saving initial batches.')
+                        
+    # 添加數據集配置參數
+    parser.add_argument('--dataset-version', type=str, default='1.0',
+                        help='Dataset version to use.')
+    parser.add_argument('--exclusions-file', type=str, default=None,
+                        help='Path to sample exclusion list file.')
+    parser.add_argument('--metadata-file', type=str, default=None,
+                        help='Path to sample metadata file.')
+    parser.add_argument('--track-ghm-samples', action='store_true',
+                        help='Track sample assignments to GHM bins.')
 
     args = parser.parse_args()
     return args
@@ -108,16 +125,33 @@ def train_model(args):
     # Setup device
     device = config.DEVICE
     print(f"Using device: {device}")
+    
+    # 加載數據集設置
+    dataset_config = DatasetConfig(
+        version=args.dataset_version,
+        exclusions=args.exclusions_file,
+        metadata_file=args.metadata_file,
+        description=f"Training run for {args.material}_{args.frequency}_{args.loss_type}"
+    )
+    
+    # 確保元數據目錄存在
+    metadata_dir = os.path.dirname(dataset_config.get_metadata_path())
+    os.makedirs(metadata_dir, exist_ok=True)
+    exclusions_dir = os.path.dirname(dataset_config.get_exclusion_path())
+    os.makedirs(exclusions_dir, exist_ok=True)
 
     # Load data
     print(f"Loading Dataset for {args.frequency} with material {args.material}")
     try:
-        dataset = SpectrogramDatasetWithMaterial(
-            config.DATA_ROOT,
-            config.CLASSES,
-            config.SEQ_NUMS,
-            args.frequency,
-            args.material
+        # 使用新的數據集類
+        dataset = AudioSpectrumDataset(
+            data_root=config.DATA_ROOT,
+            classes=config.CLASSES,
+            selected_seqs=config.SEQ_NUMS,
+            selected_freq=args.frequency,
+            material=args.material,
+            exclusion_file=dataset_config.get_exclusion_path(),
+            metadata_file=dataset_config.get_metadata_path()
         )
     except Exception as e:
         print(f"Error loading dataset: {e}")
@@ -140,8 +174,14 @@ def train_model(args):
     )
 
     # Create ranking datasets
-    train_ranking_dataset = RankingPairDataset(train_dataset)
-    val_ranking_dataset = RankingPairDataset(val_dataset)
+    # 如果是使用GHM，創建支持樣本跟蹤的排序數據集
+    if args.loss_type == 'ghm' and args.track_ghm_samples:
+        train_ranking_dataset = GHMAwareRankingDataset(train_dataset)
+        val_ranking_dataset = GHMAwareRankingDataset(val_dataset)
+        print("Using GHM-aware ranking dataset with sample tracking")
+    else:
+        train_ranking_dataset = RankingPairDataset(train_dataset)
+        val_ranking_dataset = RankingPairDataset(val_dataset)
 
     # Create DataLoaders
     min_ranking_size = min(len(train_ranking_dataset), len(val_ranking_dataset))
@@ -253,7 +293,14 @@ def train_model(args):
 
         print(f"\n===== Epoch {epoch+1}/{args.epochs} =====")
 
-        for i, (data1, data2, targets, label1, label2) in enumerate(train_dataloader):
+        for i, batch in enumerate(train_dataloader):
+            # 處理資料批次，支援新的數據集返回格式
+            if len(batch) == 7:  # 新格式：(data1, data2, targets, label1, label2, sample_id1, sample_id2)
+                data1, data2, targets, label1, label2, sample_id1, sample_id2 = batch
+            else:  # 舊格式：(data1, data2, targets, label1, label2)
+                data1, data2, targets, label1, label2 = batch
+                sample_id1 = sample_id2 = None
+                
             data1, data2, targets = data1.to(device), data2.to(device), targets.to(device)
             
             optimizer.zero_grad()
@@ -263,7 +310,11 @@ def train_model(args):
             targets = targets.view(-1)
 
             # Calculate main loss (used for backprop)
-            loss_main = criterion(outputs1, outputs2, targets)
+            if args.loss_type == 'ghm' and args.track_ghm_samples and sample_id1 is not None:
+                # 如果啟用了樣本跟蹤，傳遞樣本ID
+                loss_main = criterion(outputs1, outputs2, targets, sample_id1, sample_id2)
+            else:
+                loss_main = criterion(outputs1, outputs2, targets)
             
             # Calculate standard loss for logging comparison
             loss_standard_log = original_criterion_for_log(outputs1, outputs2, targets)
@@ -292,6 +343,29 @@ def train_model(args):
                     save_dir=stats_dir, 
                     name=f'epoch{epoch+1}_batch{i}_{timestamp}'
                 )
+                
+                # 如果啟用了樣本跟蹤，保存bin分配
+                if args.track_ghm_samples and hasattr(criterion, 'get_bin_statistics'):
+                    bin_stats = criterion.get_bin_statistics()
+                    bin_stats_path = os.path.join(stats_dir, f'bin_stats_epoch{epoch+1}_batch{i}.json')
+                    with open(bin_stats_path, 'w') as f:
+                        json.dump(bin_stats, f, indent=2)
+                    print(f"Saved bin statistics to {bin_stats_path}")
+                    
+                    # 如果使用GHMAwareRankingDataset，保存bin分配
+                    if isinstance(train_ranking_dataset, GHMAwareRankingDataset):
+                        # 迭代每個bin，記錄分配給該bin的樣本
+                        for bin_idx in range(args.ghm_bins):
+                            # 獲取該bin中的樣本對
+                            bin_samples = criterion.get_bin_samples(bin_idx)
+                            for sample_id1, sample_id2 in bin_samples:
+                                # 將bin分配記錄到樣本元數據中
+                                dataset.record_ghm_bin(sample_id1, epoch + 1, bin_idx)
+                                dataset.record_ghm_bin(sample_id2, epoch + 1, bin_idx)
+                        
+                        # 保存更新的元數據
+                        dataset.save_metadata(dataset_config.get_metadata_path())
+                        print(f"Updated sample metadata with GHM bin assignments")
 
         # Validation phase
         model.eval()
@@ -301,7 +375,13 @@ def train_model(args):
         val_total = 0
 
         with torch.no_grad():
-            for data1, data2, targets, label1, label2 in val_dataloader:
+            for batch in val_dataloader:
+                # 處理資料批次，支援新的數據集返回格式
+                if len(batch) == 7:  # 新格式
+                    data1, data2, targets, label1, label2, _, _ = batch
+                else:  # 舊格式
+                    data1, data2, targets, label1, label2 = batch
+                
                 data1, data2, targets = data1.to(device), data2.to(device), targets.to(device)
 
                 outputs1 = model(data1).view(-1)
@@ -376,6 +456,15 @@ def train_model(args):
     with open(history_path, 'wb') as f:
         pickle.dump(training_history, f)
     print(f"Training history saved to: {history_path}")
+
+    # 保存最終的數據集元數據
+    dataset.save_metadata(dataset_config.get_metadata_path())
+    print(f"Final dataset metadata saved to: {dataset_config.get_metadata_path()}")
+
+    # 保存數據集配置
+    config_path = os.path.join(stats_dir, f"dataset_config_{timestamp}.json")
+    dataset_config.save(config_path)
+    print(f"Dataset configuration saved to: {config_path}")
 
     return model, training_history
 
