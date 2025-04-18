@@ -21,7 +21,7 @@ from datasets.audio_dataset import (
     AudioSpectrumDataset, 
     SpectrogramDatasetWithMaterial  # 向後兼容
 )
-from datasets.ranking_dataset import RankingPairDataset
+from datasets.ranking_dataset import RankingPairDataset, GHMAwareRankingDataset
 from datasets.metadata import DatasetConfig, SampleMetadata
 
 # Import legacy class for backward compatibility
