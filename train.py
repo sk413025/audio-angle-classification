@@ -231,7 +231,10 @@ def train_model(args):
 
     # Create save directories
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_name = f"{args.material}_{args.frequency}_{args.loss_type}_{timestamp}"
+    if args.loss_type == 'ghm':
+        run_name = f"{args.material}_{args.frequency}_{args.loss_type}_alpha{args.ghm_alpha}_{timestamp}"
+    else:
+        run_name = f"{args.material}_{args.frequency}_{args.loss_type}_{timestamp}"
     checkpoint_dir = os.path.join(config.SAVE_DIR, 'model_checkpoints', run_name)
     plots_dir = os.path.join(config.SAVE_DIR, 'plots', run_name)
     stats_dir = os.path.join(config.SAVE_DIR, 'stats', run_name)
