@@ -150,7 +150,17 @@ class AudioSpectrumDataset(ManagedDataset):
                         self.paths.append(file_path)
                         
                         # 保存或更新元數據
-                        angle = float(class_name)
+                        # 從類名中提取角度值（例如從"deg000"中提取0）
+                        if class_name.startswith("deg"):
+                            angle_str = class_name[3:]  # 提取"deg"之後的部分
+                            angle = float(angle_str)
+                        else:
+                            # 嘗試直接解析，如果失敗則使用標籤索引
+                            try:
+                                angle = float(class_name)
+                            except ValueError:
+                                angle = float(i)  # 使用類別索引作為後備
+                        
                         metadata = self.get_sample_metadata(sample_id)
                         if not metadata:
                             metadata = {
