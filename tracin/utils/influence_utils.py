@@ -106,24 +106,31 @@ def extract_sample_ids(pair_id: str, consider_both: bool = True) -> List[str]:
     """
     從樣本對 ID 中提取單個樣本 ID。
     
+    此函數支援兩種類型的樣本對ID格式：
+    1. 排序對格式：如 "material_degXXX_freq_seq_material_degYYY_freq_seq"
+       例如 "plastic_deg000_500hz_0_plastic_deg090_500hz_0"
+    2. 單樣本 ID：若無法解析為排序對，則直接返回原始ID
+    
     Args:
-        pair_id: 樣本對 ID，格式為 "sample1_sample2"
+        pair_id: 樣本對 ID，通常格式為 "sample1_sample2"
         consider_both: 是否同時考慮樣本對中的兩個樣本
         
     Returns:
-        樣本 ID 列表
+        樣本 ID 列表，通常包含1-2個元素
     """
+    # 將 ID 按下劃線分割
     parts = pair_id.split('_')
     
-    # 找到包含度數信息的部分
+    # 查找包含角度信息的部分（通常以 "deg" 開頭）
     deg_indices = [i for i, part in enumerate(parts) if part.startswith('deg')]
-    if len(deg_indices) < 2:
-        return []
     
-    # 找到第一個樣本 ID 的結束位置和第二個樣本 ID 的開始位置
+    # 如果找到至少兩個角度信息，說明這是一個排序對 ID
     if len(deg_indices) >= 2:
+        # 用第二個角度信息的位置作為分割點
         mid_point = deg_indices[1]
-        sample1_parts = parts[:mid_point+2]  # +2 to include the degree number and the sequence number
+        
+        # 分割出兩個樣本 ID（包含角度和序列號）
+        sample1_parts = parts[:mid_point+2]  # +2 包括角度和序列號
         sample2_parts = parts[mid_point:]
         
         sample1_id = '_'.join(sample1_parts)
@@ -134,7 +141,8 @@ def extract_sample_ids(pair_id: str, consider_both: bool = True) -> List[str]:
         else:
             return [sample1_id]  # 只返回第一個樣本
     
-    return []
+    # 如果無法識別為排序對，返回完整ID作為單一樣本
+    return [pair_id]
 
 
 def save_exclusion_list(harmful_samples: List[Dict[str, Any]], output_file: str, max_exclusions: int = 50) -> int:

@@ -2,7 +2,7 @@
 """
 根據TracIn影響力分數生成樣本排除列表
 
-此腳本分析TracIn計算的影響力分數，識別對模型泛化能力有負面影響的訓練樣本，
+此腳本分析TracIn計算的影響力分數，識別對模型泛化能力有負面影響的訓練樣本或排序對，
 並生成排除列表供訓練時使用。
 """
 
@@ -41,7 +41,9 @@ def parse_args():
     parser.add_argument('--max-exclusions', type=int, default=50,
                         help='最大排除樣本數量')
     parser.add_argument('--consider-both-samples', action='store_true',
-                        help='同時考慮訓練對中的兩個樣本')
+                        help='同時考慮訓練對中的兩個樣本（等同於 --pair-mode=full_pair）')
+    parser.add_argument('--pair-mode', choices=['full_pair', 'ranking_pair'], default='ranking_pair',
+                        help='排除模式：排除完整 pair (full_pair) 或特定 ranking pair (ranking_pair)')
     parser.add_argument('--verbose', action='store_true',
                         help='顯示詳細輸出')
     parser.add_argument('--update-metadata', action='store_true',
@@ -159,12 +161,35 @@ def update_sample_metadata(samples_to_exclude, metadata_file, verbose):
         return False
 
 
+def extract_ranking_pair_id(pair_id: str) -> str:
+    """
+    保留完整的 ranking pair ID。
+    
+    對於 ranking_pair 模式，我們需要保留完整的 pair ID 作為排除標識符，
+    因為我們要排除的是特定的排序對組合，而不是單個樣本。
+    
+    Args:
+        pair_id: 原始 pair ID
+        
+    Returns:
+        原始 pair ID
+    """
+    return pair_id
+
+
 def run_generate_exclusions(args=None):
     """運行排除列表生成"""
     if args is None:
         args = parse_args()
     
+    # 處理舊參數兼容性（--consider-both-samples 等同於 --pair-mode=full_pair）
+    if hasattr(args, 'consider_both_samples') and args.consider_both_samples:
+        pair_mode = 'full_pair'
+    else:
+        pair_mode = args.pair_mode if hasattr(args, 'pair_mode') else 'ranking_pair'
+    
     print(f"開始生成基於TracIn影響力的排除列表...")
+    print(f"使用排除模式: {pair_mode}")
     
     # 分析影響力元數據
     try:
@@ -185,8 +210,8 @@ def run_generate_exclusions(args=None):
         # 生成排除列表
         samples_to_exclude = harmful_samples[:args.max_exclusions]
         
-        # 處理樣本對，提取單個樣本
-        if args.consider_both_samples:
+        # 處理樣本對，提取單個樣本或保留完整對
+        if pair_mode == 'full_pair':
             # 如果考慮對中的兩個樣本，需要展開樣本對
             expanded_samples = []
             for item in samples_to_exclude:
@@ -200,6 +225,10 @@ def run_generate_exclusions(args=None):
                         'influences': item['influences']
                     })
             samples_to_exclude = expanded_samples
+        else:  # 'ranking_pair'
+            # 保留完整的 ranking pair ID，用於排除特定排序對
+            for item in samples_to_exclude:
+                item['sample_id'] = extract_ranking_pair_id(item['sample_id'])
         
         # 保存排除列表
         num_excluded = save_exclusion_list(
@@ -209,7 +238,8 @@ def run_generate_exclusions(args=None):
         )
         
         if args.verbose:
-            print(f"已將 {num_excluded} 個樣本寫入排除列表: {args.output_file}")
+            print(f"已將 {num_excluded} 個{pair_mode == 'full_pair' and '樣本' or '排序對'}"
+                  f"寫入排除列表: {args.output_file}")
             print("\n前5個排除樣本及其負面影響:")
             for i, item in enumerate(samples_to_exclude[:5], 1):
                 print(f"{i}. {item['sample_id']}")
@@ -245,12 +275,12 @@ def run_generate_exclusions(args=None):
             plot_harmful_samples(
                 harmful_samples=samples_to_exclude,
                 save_path=plot_path,
-                title=f"Harmful Samples for {material}_{frequency}",
+                title=f"Harmful {pair_mode == 'full_pair' and 'Samples' or 'Ranking Pairs'} for {material}_{frequency}",
                 max_samples=min(20, len(samples_to_exclude))
             )
-            print(f"有害樣本圖表已保存到: {plot_path}")
+            print(f"有害{pair_mode == 'full_pair' and '樣本' or '排序對'}圖表已保存到: {plot_path}")
         
-        print(f"\n排除列表生成完成。可用於訓練時使用 --exclusions-file={args.output_file} 參數排除有害樣本。")
+        print(f"\n排除列表生成完成。可用於訓練時使用 --exclusions-file={args.output_file} 參數排除有害{pair_mode == 'full_pair' and '樣本' or '排序對'}。")
         
         # 顯示使用示例
         material = Path(args.metadata_file).stem.split('_')[0]
