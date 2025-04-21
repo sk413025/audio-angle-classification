@@ -176,12 +176,24 @@ def train_model(args):
     # Create ranking datasets
     # 如果是使用GHM，創建支持樣本跟蹤的排序數據集
     if args.loss_type == 'ghm' and args.track_ghm_samples:
-        train_ranking_dataset = GHMAwareRankingDataset(train_dataset)
-        val_ranking_dataset = GHMAwareRankingDataset(val_dataset)
+        train_ranking_dataset = GHMAwareRankingDataset(
+            train_dataset, 
+            exclusions_file=dataset_config.get_exclusion_path()
+        )
+        val_ranking_dataset = GHMAwareRankingDataset(
+            val_dataset, 
+            exclusions_file=dataset_config.get_exclusion_path()
+        )
         print("Using GHM-aware ranking dataset with sample tracking")
     else:
-        train_ranking_dataset = RankingPairDataset(train_dataset)
-        val_ranking_dataset = RankingPairDataset(val_dataset)
+        train_ranking_dataset = RankingPairDataset(
+            train_dataset, 
+            exclusions_file=dataset_config.get_exclusion_path()
+        )
+        val_ranking_dataset = RankingPairDataset(
+            val_dataset, 
+            exclusions_file=dataset_config.get_exclusion_path()
+        )
 
     # Create DataLoaders
     min_ranking_size = min(len(train_ranking_dataset), len(val_ranking_dataset))
