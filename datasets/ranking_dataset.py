@@ -9,7 +9,7 @@ import os
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from typing import Dict, List, Tuple, Optional, Any, Union
+from typing import Dict, List, Tuple, Optional, Any, Union, Set
 import pickle
 
 class RankingPairDataset(Dataset):
@@ -21,23 +21,48 @@ class RankingPairDataset(Dataset):
     - target=-1 means x2 should rank higher than x1 (x1 class < x2 class)
     """
     
-    def __init__(self, dataset, pairs_file: Optional[str] = None):
+    def __init__(self, dataset, pairs_file: Optional[str] = None, exclusions_file: Optional[str] = None):
         """
         Initialize ranking pair dataset.
         
         Args:
             dataset: Base dataset to draw samples from
             pairs_file: Optional path to saved pairs file
+            exclusions_file: Optional path to a file listing excluded pair IDs
         """
         self.dataset = dataset
         self.pairs = []
+        self.excluded_pairs: Set[str] = set()
         
+        # 載入排除列表（如果提供）
+        if exclusions_file and os.path.exists(exclusions_file):
+            self._load_exclusions(exclusions_file)
+            
         if pairs_file and os.path.exists(pairs_file):
             self._load_pairs(pairs_file)
         else:
             self.pairs = self._create_ranking_pairs()
             
         print(f"Created {len(self.pairs)} ranking pairs")
+    
+    def _load_exclusions(self, file_path: str) -> None:
+        """
+        Load the list of excluded pair IDs.
+        
+        Args:
+            file_path: Path to the exclusion list file
+        """
+        with open(file_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#'):  # Skip comments and empty lines
+                    # 確保每行代表一個完整的配對ID
+                    pair_id = line.strip()
+                    
+                    # 將配對ID添加到排除集合中
+                    self.excluded_pairs.add(pair_id)
+        
+        print(f"Loaded {len(self.excluded_pairs)} excluded pairs from {file_path}")
     
     def _load_pairs(self, path: str) -> None:
         """
@@ -48,11 +73,54 @@ class RankingPairDataset(Dataset):
         """
         try:
             with open(path, 'rb') as f:
-                self.pairs = pickle.load(f)
-            print(f"Loaded {len(self.pairs)} pairs from {path}")
+                loaded_pairs = pickle.load(f)
+                
+            # 過濾掉被排除的對
+            self.pairs = []
+            for pair in loaded_pairs:
+                if not self._is_excluded_pair(pair):
+                    self.pairs.append(pair)
+                    
+            print(f"Loaded {len(self.pairs)} valid pairs from {path} (excluded {len(loaded_pairs) - len(self.pairs)})")
         except Exception as e:
             print(f"Error loading pairs from {path}: {e}")
             self.pairs = self._create_ranking_pairs()
+    
+    def _is_excluded_pair(self, pair: Tuple[int, int, int]) -> bool:
+        """
+        Check if a pair should be excluded based on the exclusion list.
+        
+        Args:
+            pair: The pair to check (idx1, idx2, target)
+            
+        Returns:
+            True if the pair should be excluded, False otherwise
+        """
+        if not self.excluded_pairs:
+            return False
+            
+        idx1, idx2, _ = pair
+        
+        # 獲取樣本ID
+        sample1 = self.dataset[idx1]
+        sample2 = self.dataset[idx2]
+        
+        # 處理不同的返回格式
+        if len(sample1) >= 3:  # (data, label, sample_id, ...) format
+            sample_id1 = sample1[2]
+            sample_id2 = sample2[2]
+        else:
+            # 如果沒有樣本ID，使用索引作為回退
+            return False
+            
+        # 構建排序對ID - 只檢查正向排序
+        pair_id = f"{sample_id1}_{sample_id2}"
+        
+        # 只有當完全相同的排序對（包括順序）存在於排除列表中時才排除
+        if pair_id in self.excluded_pairs:
+            return True
+            
+        return False
     
     def save_pairs(self, path: str) -> None:
         """
@@ -97,10 +165,14 @@ class RankingPairDataset(Dataset):
             # 根據類別順序確定目標值
             if label1 > label2:
                 # x1 應排在 x2 前面
-                pairs.append((idx1, idx2, 1))
+                pair = (idx1, idx2, 1)
+                if not self._is_excluded_pair(pair):
+                    pairs.append(pair)
             elif label1 < label2:
                 # x2 應排在 x1 前面
-                pairs.append((idx1, idx2, -1))
+                pair = (idx1, idx2, -1)
+                if not self._is_excluded_pair(pair):
+                    pairs.append(pair)
             # 如果標籤相同，則不添加此對（繼續循環）
         
         return pairs
@@ -174,15 +246,16 @@ class GHMAwareRankingDataset(RankingPairDataset):
     are assigned to which bins during training.
     """
     
-    def __init__(self, dataset, pairs_file: Optional[str] = None):
+    def __init__(self, dataset, pairs_file: Optional[str] = None, exclusions_file: Optional[str] = None):
         """
         Initialize GHM-aware ranking dataset.
         
         Args:
             dataset: Base dataset to draw samples from
             pairs_file: Optional path to saved pairs file
+            exclusions_file: Optional path to a file listing excluded pair IDs
         """
-        super().__init__(dataset, pairs_file)
+        super().__init__(dataset, pairs_file, exclusions_file)
         self.ghm_bin_assignments = {}  # epoch -> {pair_idx -> bin_idx}
     
     def record_ghm_bin(self, idx: int, epoch: int, bin_idx: int) -> None:
