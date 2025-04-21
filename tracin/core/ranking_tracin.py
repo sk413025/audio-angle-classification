@@ -8,10 +8,12 @@ our specific ranking datasets and loss functions.
 import os
 import torch
 import numpy as np
+import json
 from typing import List, Dict, Optional, Tuple, Union
 from torch.utils.data import DataLoader, Dataset
 
-from utils.tracin.tracin import TracInCP, get_default_device
+# 更新導入路徑以使用新的模組結構
+from tracin.core.tracin import TracInCP, get_default_device
 from models.resnet_ranker import SimpleCNNAudioRanker
 from losses.ghm_loss import GHMRankingLoss
 from torch.nn import MarginRankingLoss
@@ -136,7 +138,7 @@ class RankingTracInCP(TracInCP):
         test_target: torch.Tensor,
         batch_size: int = 32,
         num_workers: int = 4
-    ) -> Dict[str, float]:
+    ) -> Tuple[Dict[str, float], Dict[str, Dict[str, float]]]:
         """
         Compute the influence scores of all pairs in a dataset on a test pair.
         
@@ -149,7 +151,9 @@ class RankingTracInCP(TracInCP):
             num_workers: Number of workers for the DataLoader
             
         Returns:
-            Dictionary mapping pair indices to influence scores
+            Tuple containing:
+            1. Dictionary mapping pair indices to total influence scores
+            2. Dictionary mapping pair indices to per-checkpoint influence scores
         """
         # Move test data to device
         test_x1 = test_x1.to(self.device)
@@ -166,6 +170,11 @@ class RankingTracInCP(TracInCP):
         
         # Initialize influence scores
         influence_scores = {}
+        # New dictionary to store per-checkpoint influence scores
+        per_checkpoint_influences = {}
+        
+        # Get checkpoint names (extract from paths)
+        checkpoint_names = [os.path.basename(cp) for cp in self.checkpoints]
         
         # Compute gradients for the test pair
         test_gradients_per_checkpoint = []
@@ -185,6 +194,8 @@ class RankingTracInCP(TracInCP):
             current_batch_size = len(indices)
             
             batch_influence = np.zeros(current_batch_size)
+            # New array to store per-checkpoint influence for this batch
+            batch_per_checkpoint_influence = [np.zeros(current_batch_size) for _ in self.checkpoints]
             
             # Compute influence across all checkpoints
             for checkpoint_idx, checkpoint in enumerate(self.checkpoints):
@@ -244,31 +255,41 @@ class RankingTracInCP(TracInCP):
                                 dot_product = torch.dot(train_flat, test_flat).item() / current_batch_size
                                 current_dot_products += np.full(current_batch_size, dot_product)
                     
-                    # Add to influence score
+                    # Store per-checkpoint influence
+                    batch_per_checkpoint_influence[checkpoint_idx] = current_dot_products
+                    
+                    # Add to total influence score
                     batch_influence += current_dot_products
                     
                 except Exception as e:
-                    print(f"Error processing checkpoint {checkpoint}: {e}")
+                    print(f"Error computing influence for checkpoint {checkpoint}: {e}")
                     # Continue with the next checkpoint
-                    continue
             
-            # Save influence scores
+            # Store influence scores
             for i, idx in enumerate(indices):
                 influence_scores[idx] = float(batch_influence[i])
+                
+                # Store per-checkpoint influence scores
+                if idx not in per_checkpoint_influences:
+                    per_checkpoint_influences[idx] = {}
+                
+                for cp_idx, cp_name in enumerate(checkpoint_names):
+                    per_checkpoint_influences[idx][cp_name] = float(batch_per_checkpoint_influence[cp_idx][i])
             
-            if batch_idx % 10 == 0:
+            if batch_idx % 10 == 0 or batch_idx + 1 == len(dataloader):
                 print(f"Processed {batch_idx+1}/{len(dataloader)} batches")
         
-        return influence_scores
+        return influence_scores, per_checkpoint_influences
     
     def compute_self_influence_for_pairs(
         self,
         dataset: Dataset,
         batch_size: int = 32,
         num_workers: int = 4
-    ) -> Dict[str, float]:
+    ) -> Tuple[Dict[str, float], Dict[str, Dict[str, float]]]:
         """
-        Compute the self-influence scores of all pairs in a dataset.
+        Compute self-influence scores for all pairs in the dataset.
+        Self-influence is a measure of the difficulty of a training example.
         
         Args:
             dataset: Dataset containing ranking pairs
@@ -276,7 +297,9 @@ class RankingTracInCP(TracInCP):
             num_workers: Number of workers for the DataLoader
             
         Returns:
-            Dictionary mapping pair indices to self-influence scores
+            Tuple containing:
+            1. Dictionary mapping pair indices to total self-influence scores
+            2. Dictionary mapping pair indices to per-checkpoint self-influence scores
         """
         # Create dataloader
         dataloader = DataLoader(
@@ -286,72 +309,75 @@ class RankingTracInCP(TracInCP):
             num_workers=num_workers
         )
         
-        # Initialize self-influence scores
+        # Initialize influence scores
         self_influence_scores = {}
+        # New dictionary to store per-checkpoint self-influence scores
+        per_checkpoint_self_influences = {}
+        
+        # Get checkpoint names (extract from paths)
+        checkpoint_names = [os.path.basename(cp) for cp in self.checkpoints]
         
         # Process pairs in batches
         for batch_idx, batch_data in enumerate(dataloader):
-            # Extract batch data - RankingPairDataset returns 7 values
+            # Extract batch data
             x1_batch, x2_batch, targets_batch, _, _, sample_id1_batch, sample_id2_batch = batch_data
             
             # Use sample IDs as indices for the influence scores
             indices = [f"{id1}_{id2}" for id1, id2 in zip(sample_id1_batch, sample_id2_batch)]
             current_batch_size = len(indices)
             
+            # Initialize influence scores for this batch
             batch_self_influence = np.zeros(current_batch_size)
+            # New array to store per-checkpoint self-influence for this batch
+            batch_per_checkpoint_self_influence = [np.zeros(current_batch_size) for _ in self.checkpoints]
             
             # Compute self-influence across all checkpoints
-            for checkpoint in self.checkpoints:
+            for checkpoint_idx, checkpoint in enumerate(self.checkpoints):
                 try:
-                    # Compute gradients
+                    # Compute gradients for this batch
                     gradients = self.compute_gradients_for_pair(
                         x1_batch, x2_batch, targets_batch, checkpoint
                     )
                     
-                    # Compute gradient norms
+                    # Compute gradient norm squared for each example in batch
                     current_grad_norm_squared = np.zeros(current_batch_size)
                     
                     for grad in gradients:
-                        # Ensure we're handling each gradient tensor correctly based on its dimensions
-                        if grad.dim() == 0:  # Scalar
-                            norm_squared = (grad.item() ** 2)
-                            current_grad_norm_squared += np.full(current_batch_size, norm_squared)
-                        elif grad.dim() == 1:  # Vector
-                            if grad.size(0) == current_batch_size:
-                                # Gradient has one value per sample
-                                norms = (grad ** 2).cpu().numpy()
-                                current_grad_norm_squared += norms
-                            else:
-                                # Gradient is shared across samples
-                                norm_squared = (grad ** 2).sum().item()
-                                current_grad_norm_squared += np.full(current_batch_size, norm_squared / current_batch_size)
-                        else:  # Multi-dimensional tensor
-                            if grad.size(0) == current_batch_size:
-                                # First dimension matches batch size, process each sample separately
-                                sample_grads = grad.reshape(current_batch_size, -1)
-                                norms = torch.sum(sample_grads ** 2, dim=1).cpu().numpy()
-                                current_grad_norm_squared += norms
-                            else:
-                                # Reshape might not match batch size, use a more robust approach
-                                total_norm_squared = torch.sum(grad ** 2).item()
-                                current_grad_norm_squared += np.full(current_batch_size, total_norm_squared / current_batch_size)
+                        if grad.size(0) == current_batch_size:
+                            # Gradient has batch dimension
+                            grad_flat = grad.reshape(current_batch_size, -1)
+                            grad_norm_squared = torch.sum(grad_flat ** 2, dim=1).cpu().numpy()
+                            current_grad_norm_squared += grad_norm_squared
+                        else:
+                            # Gradient does not have batch dimension or is scalar
+                            grad_norm_squared = torch.sum(grad ** 2).item() / current_batch_size
+                            current_grad_norm_squared += np.full(current_batch_size, grad_norm_squared)
                     
-                    # Add to self-influence score
+                    # Store per-checkpoint self-influence
+                    batch_per_checkpoint_self_influence[checkpoint_idx] = current_grad_norm_squared
+                    
+                    # Add to total self-influence score
                     batch_self_influence += current_grad_norm_squared
                     
                 except Exception as e:
-                    print(f"Error processing checkpoint {checkpoint}: {e}")
+                    print(f"Error computing self-influence for checkpoint {checkpoint}: {e}")
                     # Continue with the next checkpoint
-                    continue
             
-            # Save self-influence scores
+            # Store self-influence scores
             for i, idx in enumerate(indices):
                 self_influence_scores[idx] = float(batch_self_influence[i])
+                
+                # Store per-checkpoint self-influence scores
+                if idx not in per_checkpoint_self_influences:
+                    per_checkpoint_self_influences[idx] = {}
+                
+                for cp_idx, cp_name in enumerate(checkpoint_names):
+                    per_checkpoint_self_influences[idx][cp_name] = float(batch_per_checkpoint_self_influence[cp_idx][i])
             
-            if batch_idx % 10 == 0:
+            if batch_idx % 10 == 0 or batch_idx + 1 == len(dataloader):
                 print(f"Processed {batch_idx+1}/{len(dataloader)} batches")
         
-        return self_influence_scores
+        return self_influence_scores, per_checkpoint_self_influences
     
     def save_to_project_metadata(
         self,
@@ -365,17 +391,85 @@ class RankingTracInCP(TracInCP):
         Save influence scores to the project's metadata directory.
         
         Args:
-            influence_scores: Dictionary mapping example indices to influence scores
-            metadata_dir: Base metadata directory path
-            material: Material type (e.g., "metal")
-            frequency: Frequency type (e.g., "500hz")
-            score_name: Name of the score in the metadata file
+            influence_scores: Dictionary mapping training example indices to influence scores
+            metadata_dir: Directory path to save the metadata
+            material: Material type (e.g., 'metal', 'plastic')
+            frequency: Frequency data (e.g., '500hz', '1000hz')
+            score_name: Name for the influence score in metadata file
         """
-        # Construct the metadata path following the project's convention
+        # Create path to metadata file
         metadata_path = os.path.join(
             metadata_dir,
             f"{material}_{frequency}_metadata.json"
         )
         
-        # Use the parent class's save method
-        self.save_influence_scores(influence_scores, metadata_path, score_name) 
+        # Make directory if it doesn't exist
+        os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
+        
+        # Load existing metadata if it exists
+        metadata = {}
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+        
+        # Update metadata with influence scores
+        for idx, score in influence_scores.items():
+            if idx not in metadata:
+                metadata[idx] = {}
+            
+            # Add new score to metadata
+            metadata[idx][score_name] = score
+        
+        # Save updated metadata
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        print(f"Saved {len(influence_scores)} influence scores to {metadata_path}")
+    
+    def save_per_checkpoint_influence(
+        self,
+        per_checkpoint_influences: Dict[str, Dict[str, float]],
+        metadata_dir: str,
+        material: str,
+        frequency: str,
+        score_name: str = "tracin_influence"
+    ) -> None:
+        """
+        Save per-checkpoint influence scores to the project's metadata directory.
+        
+        Args:
+            per_checkpoint_influences: Dictionary mapping training example indices to per-checkpoint influence scores
+            metadata_dir: Directory path to save the metadata
+            material: Material type (e.g., 'metal', 'plastic')
+            frequency: Frequency data (e.g., '500hz', '1000hz')
+            score_name: Base name for the influence score in metadata file
+        """
+        # Create path to metadata file
+        metadata_path = os.path.join(
+            metadata_dir,
+            f"{material}_{frequency}_per_checkpoint_metadata.json"
+        )
+        
+        # Make directory if it doesn't exist
+        os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
+        
+        # Load existing metadata if it exists
+        metadata = {}
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+        
+        # Update metadata with per-checkpoint influence scores
+        for idx, checkpoint_scores in per_checkpoint_influences.items():
+            if idx not in metadata:
+                metadata[idx] = {}
+            
+            # Add new scores to metadata
+            for checkpoint_name, score in checkpoint_scores.items():
+                metadata[idx][f"{score_name}_{checkpoint_name}"] = score
+        
+        # Save updated metadata
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        print(f"Saved per-checkpoint influence scores for {len(per_checkpoint_influences)} examples to {metadata_path}") 
