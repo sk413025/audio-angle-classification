@@ -171,7 +171,7 @@ class TracInCP:
                 for train_grad, test_grad in zip(train_gradients, test_gradients):
                     # Flatten the gradients and compute dot product
                     batch_dot_product += torch.sum(
-                        train_grad.flatten(1) * test_grad.flatten(1), dim=1
+                        train_grad.flatten() * test_grad.flatten()
                     ).cpu().numpy()
                 
                 # Add to influence score
