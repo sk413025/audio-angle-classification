@@ -1,0 +1,19 @@
+class GHMAwareRankingDataset(RankingPairDataset):
+    """
+    Enhanced ranking dataset that handles GHM bin tracking.
+    
+    This dataset works with GHM loss functions to track which samples
+    are assigned to which bins during training.
+    """
+    
+    def __init__(self, dataset, pairs_file: Optional[str] = None, exclusions_file: Optional[str] = None):
+        """
+        Initialize GHM-aware ranking dataset.
+        
+        Args:
+            dataset: Base dataset to draw samples from
+            pairs_file: Optional path to saved pairs file
+            exclusions_file: Optional path to a file listing excluded pair IDs
+        """
+        super().__init__(dataset, pairs_file, exclusions_file)
+        self.ghm_bin_assignments = {}  # epoch -> {pair_idx -> bin_idx} 

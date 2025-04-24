@@ -1,1 +1,3 @@
-"""\nCommand-line scripts for TracIn influence analysis.\n"""\n
+"""
+Command-line scripts for TracIn influence analysis.
+"""

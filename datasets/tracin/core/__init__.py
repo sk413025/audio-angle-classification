@@ -1,1 +1,6 @@
-"""\nTracIn core implementations.\n"""\n\nfrom datasets.tracin.core.tracin import TracInCP\nfrom datasets.tracin.core.ranking_tracin import RankingTracInCP\n
+"""
+TracIn core implementations.
+"""
+
+from datasets.tracin.core.tracin import TracInCP
+from datasets.tracin.core.ranking_tracin import RankingTracInCP

@@ -1,1 +1,299 @@
-"""\nTracIn implementation for calculating the influence of training data examples.\n\nBased on \"Estimating Training Data Influence by Tracing Gradient Descent\"\nby Pang Wei Koh and Percy Liang.\n\nThis module allows the calculation of influence scores without modifying \nthe existing training pipeline. It hooks into the checkpoints saved during\ntraining to compute gradients and influence scores.\n"""\n\nimport os\nimport json\nimport torch\nimport numpy as np\nfrom typing import List, Dict, Tuple, Optional, Union, Callable\nfrom torch.utils.data import DataLoader, Dataset\nimport torch.nn.functional as F\n\n\ndef get_default_device():\n    """\n    Get the default device for tensor operations.\n    Returns CUDA if available, then MPS if available, otherwise CPU.\n    """\n    if torch.cuda.is_available():\n        return torch.device('cuda')\n    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():\n        return torch.device('mps')\n    else:\n        return torch.device('cpu')\n\n\nclass TracInCP:\n    """\n    TracIn with checkpoints implementation.\n    \n    This class implements the TracIn method using model checkpoints saved during training.\n    It computes the influence of training examples on test examples by tracing the\n    optimization trajectory using saved checkpoints.\n    """\n    \n    def __init__(\n        self,\n        model: torch.nn.Module,\n        checkpoints: List[str],\n        loss_fn: Callable,\n        device: torch.device = None\n    ):\n        """\n        Initialize TracInCP.\n        \n        Args:\n            model: The model architecture (un-trained instance)\n            checkpoints: List of file paths to the saved model checkpoints\n            loss_fn: Loss function used in training (e.g., nn.CrossEntropyLoss())\n            device: Device to perform computations on\n        """\n        # Use provided device or get default device\n        if device is None:\n            device = get_default_device()\n            \n        self.model = model\n        self.checkpoints = checkpoints\n        self.loss_fn = loss_fn\n        self.device = device\n        \n        # Validate checkpoints\n        for checkpoint in self.checkpoints:\n            if not os.path.exists(checkpoint):\n                raise FileNotFoundError(f\"Checkpoint {checkpoint} does not exist\")\n                \n        print(f\"TracIn initialized with {len(checkpoints)} checkpoints on {device}\")\n    \n    def compute_gradients(\n        self, \n        inputs: torch.Tensor, \n        targets: torch.Tensor,\n        checkpoint: str\n    ) -> List[torch.Tensor]:\n        """\n        Compute gradients of the loss with respect to model parameters.\n        \n        Args:\n            inputs: Input tensor\n            targets: Target tensor\n            checkpoint: Path to the model checkpoint to use\n            \n        Returns:\n            List of gradient tensors for each parameter\n        """\n        # Load the checkpoint\n        checkpoint_data = torch.load(checkpoint, map_location=self.device)\n        self.model.load_state_dict(checkpoint_data['model_state_dict'])\n        self.model.to(self.device)\n        self.model.eval()\n        \n        # Move inputs to device\n        inputs = inputs.to(self.device)\n        targets = targets.to(self.device)\n        \n        # Zero gradients\n        self.model.zero_grad()\n        \n        # Forward pass\n        outputs = self.model(inputs)\n        \n        # Compute loss\n        loss = self.loss_fn(outputs, targets)\n        \n        # Backward pass\n        loss.backward()\n        \n        # Get gradients\n        gradients = []\n        for param in self.model.parameters():\n            if param.requires_grad and param.grad is not None:\n                gradients.append(param.grad.clone().detach())\n                \n        return gradients\n    \n    def compute_influence(\n        self,\n        train_dataset: Dataset,\n        test_inputs: torch.Tensor,\n        test_targets: torch.Tensor,\n        batch_size: int = 32,\n        num_workers: int = 4\n    ) -> Dict[Union[int, str], float]:\n        """\n        Compute the influence scores of all training examples on a test example.\n        \n        Args:\n            train_dataset: Dataset containing training examples\n            test_inputs: Input tensor for the test example\n            test_targets: Target tensor for the test example\n            batch_size: Batch size for processing training examples\n            num_workers: Number of workers for the DataLoader\n            \n        Returns:\n            Dictionary mapping training example indices to influence scores\n        """\n        # Create dataloader for training examples\n        train_loader = DataLoader(\n            train_dataset, \n            batch_size=batch_size,\n            shuffle=False,\n            num_workers=num_workers\n        )\n        \n        # Initialize influence scores\n        influence_scores = {}\n        \n        # Compute gradients for the test example\n        test_gradients_per_checkpoint = []\n        for checkpoint in self.checkpoints:\n            test_gradients = self.compute_gradients(test_inputs, test_targets, checkpoint)\n            test_gradients_per_checkpoint.append(test_gradients)\n        \n        # Process training examples in batches\n        for batch_idx, (train_inputs, train_targets, indices) in enumerate(train_loader):\n            batch_influence = np.zeros(len(indices))\n            \n            # Compute influence across all checkpoints\n            for checkpoint_idx, checkpoint in enumerate(self.checkpoints):\n                train_gradients = self.compute_gradients(train_inputs, train_targets, checkpoint)\n                test_gradients = test_gradients_per_checkpoint[checkpoint_idx]\n                \n                # Compute dot product between train and test gradients\n                batch_dot_product = 0\n                for train_grad, test_grad in zip(train_gradients, test_gradients):\n                    # Flatten the gradients and compute dot product\n                    batch_dot_product += torch.sum(\n                        train_grad.flatten() * test_grad.flatten()\n                    ).cpu().numpy()\n                \n                # Add to influence score\n                batch_influence += batch_dot_product\n                \n            # Save influence scores\n            if isinstance(indices, torch.Tensor) and indices.dtype == torch.int64:\n                # If indices are integers\n                for i, idx in enumerate(indices.cpu().numpy()):\n                    influence_scores[int(idx)] = float(batch_influence[i])\n            else:\n                # For string or other types of indices\n                for i, idx in enumerate(indices):\n                    influence_scores[idx] = float(batch_influence[i])\n            \n            if batch_idx % 10 == 0:\n                print(f\"Processed {batch_idx+1}/{len(train_loader)} batches\")\n        \n        return influence_scores\n\n    def compute_self_influence(\n        self,\n        dataset: Dataset,\n        batch_size: int = 32,\n        num_workers: int = 4\n    ) -> Dict[Union[int, str], float]:\n        """\n        Compute the self-influence scores of all examples in a dataset.\n        Self-influence is a measure of the difficulty of an example.\n        \n        Args:\n            dataset: Dataset containing examples\n            batch_size: Batch size for processing examples\n            num_workers: Number of workers for the DataLoader\n            \n        Returns:\n            Dictionary mapping example indices to self-influence scores\n        """\n        # Create dataloader for examples\n        loader = DataLoader(\n            dataset, \n            batch_size=batch_size,\n            shuffle=False,\n            num_workers=num_workers\n        )\n        \n        # Initialize self-influence scores\n        self_influence_scores = {}\n        \n        # Process examples in batches\n        for batch_idx, (inputs, targets, indices) in enumerate(loader):\n            batch_self_influence = np.zeros(len(indices))\n            \n            # Compute self-influence across all checkpoints\n            for checkpoint in self.checkpoints:\n                # Compute gradients\n                gradients = self.compute_gradients(inputs, targets, checkpoint)\n                \n                # Compute gradient norms\n                batch_grad_norm_squared = 0\n                for grad in gradients:\n                    # Check gradient dimensions\n                    if grad.dim() <= 1:\n                        # If gradient is 1D, just square and sum\n                        batch_grad_norm_squared += (grad ** 2).sum().cpu().numpy()\n                    else:\n                        # If gradient is multi-dimensional, flatten each sample\n                        # and then compute squared norm\n                        batch_grad_norm_squared += torch.sum(\n                            grad.reshape(grad.size(0), -1) ** 2, dim=1\n                        ).cpu().numpy()\n                \n                # Add to self-influence score\n                batch_self_influence += batch_grad_norm_squared\n                \n            # Save self-influence scores\n            if isinstance(indices, torch.Tensor) and indices.dtype == torch.int64:\n                # If indices are integers\n                for i, idx in enumerate(indices.cpu().numpy()):\n                    self_influence_scores[int(idx)] = float(batch_self_influence[i])\n            else:\n                # For string or other types of indices\n                for i, idx in enumerate(indices):\n                    self_influence_scores[idx] = float(batch_self_influence[i])\n            \n            if batch_idx % 10 == 0:\n                print(f\"Processed {batch_idx+1}/{len(loader)} batches\")\n        \n        return self_influence_scores\n\n    def save_influence_scores(\n        self,\n        influence_scores: Dict[Union[int, str], float],\n        metadata_path: str,\n        score_name: str = \"tracin_influence\"\n    ) -> None:\n        """\n        Save the influence scores to a metadata file.\n        \n        Args:\n            influence_scores: Dictionary mapping example indices to influence scores\n            metadata_path: Path to save the metadata\n            score_name: Name of the score in the metadata file\n        """\n        # Make directory if it doesn't exist\n        os.makedirs(os.path.dirname(metadata_path), exist_ok=True)\n        \n        # Load existing metadata if it exists\n        metadata = {}\n        if os.path.exists(metadata_path):\n            with open(metadata_path, 'r') as f:\n                metadata = json.load(f)\n        \n        # Update metadata with influence scores\n        for idx, score in influence_scores.items():\n            idx_str = str(idx)  # Convert any index to string for JSON\n            if idx_str not in metadata:\n                metadata[idx_str] = {}\n            metadata[idx_str][score_name] = score\n        \n        # Save updated metadata\n        with open(metadata_path, 'w') as f:\n            json.dump(metadata, f, indent=2)\n            \n        print(f\"Saved {len(influence_scores)} influence scores to {metadata_path}\")\n
+"""
+TracIn implementation for calculating the influence of training data examples.
+
+Based on "Estimating Training Data Influence by Tracing Gradient Descent"
+by Pang Wei Koh and Percy Liang.
+
+This module allows the calculation of influence scores without modifying 
+the existing training pipeline. It hooks into the checkpoints saved during
+training to compute gradients and influence scores.
+"""
+
+import os
+import json
+import torch
+import numpy as np
+from typing import List, Dict, Tuple, Optional, Union, Callable
+from torch.utils.data import DataLoader, Dataset
+import torch.nn.functional as F
+
+
+def get_default_device():
+    """
+    Get the default device for tensor operations.
+    Returns CUDA if available, then MPS if available, otherwise CPU.
+    """
+    if torch.cuda.is_available():
+        return torch.device('cuda')
+    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        return torch.device('mps')
+    else:
+        return torch.device('cpu')
+
+
+class TracInCP:
+    """
+    TracIn with checkpoints implementation.
+    
+    This class implements the TracIn method using model checkpoints saved during training.
+    It computes the influence of training examples on test examples by tracing the
+    optimization trajectory using saved checkpoints.
+    """
+    
+    def __init__(
+        self,
+        model: torch.nn.Module,
+        checkpoints: List[str],
+        loss_fn: Callable,
+        device: torch.device = None
+    ):
+        """
+        Initialize TracInCP.
+        
+        Args:
+            model: The model architecture (un-trained instance)
+            checkpoints: List of file paths to the saved model checkpoints
+            loss_fn: Loss function used in training (e.g., nn.CrossEntropyLoss())
+            device: Device to perform computations on
+        """
+        # Use provided device or get default device
+        if device is None:
+            device = get_default_device()
+            
+        self.model = model
+        self.checkpoints = checkpoints
+        self.loss_fn = loss_fn
+        self.device = device
+        
+        # Validate checkpoints
+        for checkpoint in self.checkpoints:
+            if not os.path.exists(checkpoint):
+                raise FileNotFoundError(f"Checkpoint {checkpoint} does not exist")
+                
+        print(f"TracIn initialized with {len(checkpoints)} checkpoints on {device}")
+    
+    def compute_gradients(
+        self, 
+        inputs: torch.Tensor, 
+        targets: torch.Tensor,
+        checkpoint: str
+    ) -> List[torch.Tensor]:
+        """
+        Compute gradients of the loss with respect to model parameters.
+        
+        Args:
+            inputs: Input tensor
+            targets: Target tensor
+            checkpoint: Path to the model checkpoint to use
+            
+        Returns:
+            List of gradient tensors for each parameter
+        """
+        # Load the checkpoint
+        checkpoint_data = torch.load(checkpoint, map_location=self.device)
+        self.model.load_state_dict(checkpoint_data['model_state_dict'])
+        self.model.to(self.device)
+        self.model.eval()
+        
+        # Move inputs to device
+        inputs = inputs.to(self.device)
+        targets = targets.to(self.device)
+        
+        # Zero gradients
+        self.model.zero_grad()
+        
+        # Forward pass
+        outputs = self.model(inputs)
+        
+        # Compute loss
+        loss = self.loss_fn(outputs, targets)
+        
+        # Backward pass
+        loss.backward()
+        
+        # Get gradients
+        gradients = []
+        for param in self.model.parameters():
+            if param.requires_grad and param.grad is not None:
+                gradients.append(param.grad.clone().detach())
+                
+        return gradients
+    
+    def compute_influence(
+        self,
+        train_dataset: Dataset,
+        test_inputs: torch.Tensor,
+        test_targets: torch.Tensor,
+        batch_size: int = 32,
+        num_workers: int = 4
+    ) -> Dict[Union[int, str], float]:
+        """
+        Compute the influence scores of all training examples on a test example.
+        
+        Args:
+            train_dataset: Dataset containing training examples
+            test_inputs: Input tensor for the test example
+            test_targets: Target tensor for the test example
+            batch_size: Batch size for processing training examples
+            num_workers: Number of workers for the DataLoader
+            
+        Returns:
+            Dictionary mapping training example indices to influence scores
+        """
+        # Create dataloader for training examples
+        train_loader = DataLoader(
+            train_dataset, 
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=num_workers
+        )
+        
+        # Initialize influence scores
+        influence_scores = {}
+        
+        # Compute gradients for the test example
+        test_gradients_per_checkpoint = []
+        for checkpoint in self.checkpoints:
+            test_gradients = self.compute_gradients(test_inputs, test_targets, checkpoint)
+            test_gradients_per_checkpoint.append(test_gradients)
+        
+        # Process training examples in batches
+        for batch_idx, (train_inputs, train_targets, indices) in enumerate(train_loader):
+            batch_influence = np.zeros(len(indices))
+            
+            # Compute influence across all checkpoints
+            for checkpoint_idx, checkpoint in enumerate(self.checkpoints):
+                train_gradients = self.compute_gradients(train_inputs, train_targets, checkpoint)
+                test_gradients = test_gradients_per_checkpoint[checkpoint_idx]
+                
+                # Compute dot product between train and test gradients
+                batch_dot_product = 0
+                for train_grad, test_grad in zip(train_gradients, test_gradients):
+                    # Flatten the gradients and compute dot product
+                    batch_dot_product += torch.sum(
+                        train_grad.flatten() * test_grad.flatten()
+                    ).cpu().numpy()
+                
+                # Add to influence score
+                batch_influence += batch_dot_product
+                
+            # Save influence scores
+            if isinstance(indices, torch.Tensor) and indices.dtype == torch.int64:
+                # If indices are integers
+                for i, idx in enumerate(indices.cpu().numpy()):
+                    influence_scores[int(idx)] = float(batch_influence[i])
+            else:
+                # For string or other types of indices
+                for i, idx in enumerate(indices):
+                    influence_scores[idx] = float(batch_influence[i])
+            
+            if batch_idx % 10 == 0:
+                print(f"Processed {batch_idx+1}/{len(train_loader)} batches")
+        
+        return influence_scores
+
+    def compute_self_influence(
+        self,
+        dataset: Dataset,
+        batch_size: int = 32,
+        num_workers: int = 4
+    ) -> Dict[Union[int, str], float]:
+        """
+        Compute the self-influence scores of all examples in a dataset.
+        Self-influence is a measure of the difficulty of an example.
+        
+        Args:
+            dataset: Dataset containing examples
+            batch_size: Batch size for processing examples
+            num_workers: Number of workers for the DataLoader
+            
+        Returns:
+            Dictionary mapping example indices to self-influence scores
+        """
+        # Create dataloader for examples
+        loader = DataLoader(
+            dataset, 
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=num_workers
+        )
+        
+        # Initialize self-influence scores
+        self_influence_scores = {}
+        
+        # Process examples in batches
+        for batch_idx, (inputs, targets, indices) in enumerate(loader):
+            batch_self_influence = np.zeros(len(indices))
+            
+            # Compute self-influence across all checkpoints
+            for checkpoint in self.checkpoints:
+                # Compute gradients
+                gradients = self.compute_gradients(inputs, targets, checkpoint)
+                
+                # Compute gradient norms
+                batch_grad_norm_squared = 0
+                for grad in gradients:
+                    # Check gradient dimensions
+                    if grad.dim() <= 1:
+                        # If gradient is 1D, just square and sum
+                        batch_grad_norm_squared += (grad ** 2).sum().cpu().numpy()
+                    else:
+                        # If gradient is multi-dimensional, flatten each sample
+                        # and then compute squared norm
+                        batch_grad_norm_squared += torch.sum(
+                            grad.reshape(grad.size(0), -1) ** 2, dim=1
+                        ).cpu().numpy()
+                
+                # Add to self-influence score
+                batch_self_influence += batch_grad_norm_squared
+                
+            # Save self-influence scores
+            if isinstance(indices, torch.Tensor) and indices.dtype == torch.int64:
+                # If indices are integers
+                for i, idx in enumerate(indices.cpu().numpy()):
+                    self_influence_scores[int(idx)] = float(batch_self_influence[i])
+            else:
+                # For string or other types of indices
+                for i, idx in enumerate(indices):
+                    self_influence_scores[idx] = float(batch_self_influence[i])
+            
+            if batch_idx % 10 == 0:
+                print(f"Processed {batch_idx+1}/{len(loader)} batches")
+        
+        return self_influence_scores
+
+    def save_influence_scores(
+        self,
+        influence_scores: Dict[Union[int, str], float],
+        metadata_path: str,
+        score_name: str = "tracin_influence"
+    ) -> None:
+        """
+        Save the influence scores to a metadata file.
+        
+        Args:
+            influence_scores: Dictionary mapping example indices to influence scores
+            metadata_path: Path to save the metadata
+            score_name: Name of the score in the metadata file
+        """
+        # Make directory if it doesn't exist
+        os.makedirs(os.path.dirname(metadata_path), exist_ok=True)
+        
+        # Load existing metadata if it exists
+        metadata = {}
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+        
+        # Update metadata with influence scores
+        for idx, score in influence_scores.items():
+            idx_str = str(idx)  # Convert any index to string for JSON
+            if idx_str not in metadata:
+                metadata[idx_str] = {}
+            metadata[idx_str][score_name] = score
+        
+        # Save updated metadata
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+            
+        print(f"Saved {len(influence_scores)} influence scores to {metadata_path}") 

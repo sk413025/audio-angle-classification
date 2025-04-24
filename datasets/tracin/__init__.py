@@ -1,1 +1,16 @@
-"""\nTracIn Influence Analysis Module\n\nThis module provides functionality for analyzing training sample influence\nusing the TracIn method.\n\nMain components:\n- core/tracin.py: Base TracIn implementation\n- core/ranking_tracin.py: Ranking-specific TracIn implementation\n- utils/influence_utils.py: Tools for handling influence scores\n- utils/visualization.py: Visualization tools\n- scripts/: Command-line scripts for influence analysis workflow\n"""\n\nfrom datasets.tracin.core.tracin import TracInCP\nfrom datasets.tracin.core.ranking_tracin import RankingTracInCP\n
+"""
+TracIn Influence Analysis Module
+
+This module provides functionality for analyzing training sample influence
+using the TracIn method.
+
+Main components:
+- core/tracin.py: Base TracIn implementation
+- core/ranking_tracin.py: Ranking-specific TracIn implementation
+- utils/influence_utils.py: Tools for handling influence scores
+- utils/visualization.py: Visualization tools
+- scripts/: Command-line scripts for influence analysis workflow
+"""
+
+from datasets.tracin.core.tracin import TracInCP
+from datasets.tracin.core.ranking_tracin import RankingTracInCP
