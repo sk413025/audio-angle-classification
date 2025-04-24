@@ -8,12 +8,14 @@ It provides facilities for:
 - Managing sample metadata
 - Filtering and excluding problematic samples
 - Tracking samples during training
+- Analyzing training sample influence (via tracin submodule)
 
 Main components:
 - base.py: Base dataset classes with common functionality
 - audio_dataset.py: Audio and spectrogram dataset implementations
 - ranking_dataset.py: Dataset for ranking pairs
 - metadata.py: Sample metadata management
+- tracin/: Training sample influence analysis
 """
 
 from datasets.base import ManagedDataset
@@ -27,3 +29,7 @@ from datasets.metadata import DatasetConfig, SampleMetadata
 # Import legacy class for backward compatibility
 # (This allows existing code to continue working with minimal changes)
 from datasets.audio_dataset import SpectrogramDatasetWithMaterial as LegacySpectrogramDatasetWithMaterial 
+
+# Import TracIn module for influence analysis
+from datasets.tracin import TracInCP, RankingTracInCP
+import datasets.tracin as tracin 
