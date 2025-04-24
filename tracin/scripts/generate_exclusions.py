@@ -36,6 +36,8 @@ def parse_args():
                         help='輸出排除列表文件路徑')
     parser.add_argument('--threshold', type=float, default=-5.0,
                         help='負面影響力閾值（低於此值的樣本將被排除）')
+    parser.add_argument('--upper-threshold', type=float, default=20.0,
+                        help='正面影響力閾值（高於此值的樣本將被排除）')
     parser.add_argument('--min-occurrences', type=int, default=3,
                         help='一個樣本至少在多少個測試樣本上有負面影響才被排除')
     parser.add_argument('--max-exclusions', type=int, default=50,
@@ -123,9 +125,14 @@ def update_sample_metadata(samples_to_exclude, metadata_file, verbose):
             
             # 記錄排除原因
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            if item['average_influence'] > 0:
+                reason = f"此樣本對{item['negative_occurrences']}個測試樣本有過高正面影響"
+            else:
+                reason = f"此樣本對{item['negative_occurrences']}個測試樣本有負面影響"
+                
             metadata['notes'] = (
                 f"TracIn分析排除 ({timestamp}): "
-                f"此樣本對{item['negative_occurrences']}個測試樣本有負面影響，"
+                f"{reason}，"
                 f"平均影響力分數: {item['average_influence']:.4f}. "
                 f"示例: {'; '.join(example_influences)}"
             )
@@ -159,18 +166,71 @@ def update_sample_metadata(samples_to_exclude, metadata_file, verbose):
         return False
 
 
+def get_samples_outside_thresholds(metadata_file, lower_threshold, upper_threshold, min_occurrences, score_prefix="tracin_influence_"):
+    """獲取超出上下閾值范圍的樣本 - 正確版本"""
+    with open(metadata_file, 'r') as f:
+        metadata = json.load(f)
+    
+    # 正確的數據結構理解:
+    # 元數據文件的主鍵是訓練樣本對ID
+    # 每個訓練樣本對有多個測試樣本的影響力記錄，格式為 "tracin_influence_測試樣本對ID": 影響力分數
+    
+    # 記錄每個訓練樣本對對測試樣本的異常影響
+    training_sample_influences = defaultdict(list)
+    
+    # 遍歷所有訓練樣本對
+    for training_id, influence_records in metadata.items():
+        # 找出所有影響力超出閾值的測試樣本
+        abnormal_influences = []
+        
+        for key, score in influence_records.items():
+            if not key.startswith(score_prefix):
+                continue
+                
+            # 從鍵名提取測試樣本對ID
+            test_sample_id = key[len(score_prefix):]
+            
+            # 檢查影響力分數是否超出閾值範圍
+            if score < lower_threshold or score > upper_threshold:
+                abnormal_influences.append((test_sample_id, score))
+        
+        # 如果這個訓練樣本對對足夠多的測試樣本有異常影響，則記錄
+        if len(abnormal_influences) >= min_occurrences:
+            # 計算平均影響力分數
+            avg_influence = sum([score for _, score in abnormal_influences]) / len(abnormal_influences)
+            
+            training_sample_influences[training_id] = {
+                'sample_id': training_id,
+                'negative_occurrences': len(abnormal_influences),
+                'average_influence': avg_influence,
+                'examples': abnormal_influences[:3],  # 保存幾個例子用於展示
+                'influences': abnormal_influences
+            }
+    
+    # 準備排除列表
+    harmful_samples = list(training_sample_influences.values())
+    
+    # 根據異常影響的測試樣本數量排序
+    harmful_samples.sort(key=lambda x: x['negative_occurrences'], reverse=True)
+    
+    return harmful_samples
+
+
 def run_generate_exclusions(args=None):
     """運行排除列表生成"""
     if args is None:
         args = parse_args()
     
     print(f"開始生成基於TracIn影響力的排除列表...")
+    print(f"影響力閾值範圍: < {args.threshold} 或 > {args.upper_threshold}")
     
     # 分析影響力元數據
     try:
-        harmful_samples = get_harmful_samples(
+        # 使用新的函數同時考慮上下閾值
+        harmful_samples = get_samples_outside_thresholds(
             args.metadata_file,
             args.threshold,
+            args.upper_threshold,
             args.min_occurrences,
             score_prefix="tracin_influence_"
         )
@@ -211,10 +271,10 @@ def run_generate_exclusions(args=None):
         
         if args.verbose:
             print(f"已將 {num_excluded} 個樣本寫入排除列表: {args.output_file}")
-            print("\n前5個排除樣本及其負面影響:")
+            print("\n前5個排除樣本及其影響:")
             for i, item in enumerate(samples_to_exclude[:5], 1):
                 print(f"{i}. {item['sample_id']}")
-                print(f"   負面影響出現次數: {item['negative_occurrences']}")
+                print(f"   影響出現次數: {item['negative_occurrences']}")
                 print(f"   平均影響力分數: {item['average_influence']:.4f}")
                 print(f"   示例影響 (測試樣本, 分數):")
                 for test_id, score in item['examples']:

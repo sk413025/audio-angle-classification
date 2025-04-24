@@ -8,7 +8,8 @@ set -e
 METADATA_DIR="/Users/sbplab/Hank/audio-angle-classification/metadata"
 FREQUENCIES=("500hz" "1000hz" "3000hz")
 MATERIAL="plastic"
-THRESHOLD="-5.0"
+THRESHOLD="-20.0"
+UPPER_THRESHOLD="20.0"
 MIN_OCCURRENCES=3
 MAX_EXCLUSIONS=50
 PAIR_MODE="ranking_pair"
@@ -26,8 +27,9 @@ function show_help {
     echo "  -o, --output-dir DIR        保存排除列表的目錄 (默認: /Users/sbplab/Hank/sinetone_sliced/step_018_sliced/metadata)"
     echo "  -f, --frequencies FREQS     要處理的頻率列表，用逗號分隔 (默認: 500hz,1000hz,3000hz)"
     echo "  -a, --material STR          材料類型 (默認: $MATERIAL)"
-    echo "  -t, --threshold NUM         負面影響閾值 (默認: $THRESHOLD)"
-    echo "  -n, --min-occurrences NUM   最小負面影響出現次數 (默認: $MIN_OCCURRENCES)"
+    echo "  -t, --threshold NUM         負面影響力下限閾值 (默認: $THRESHOLD)"
+    echo "  -u, --upper-threshold NUM   正面影響力上限閾值 (默認: $UPPER_THRESHOLD)"
+    echo "  -n, --min-occurrences NUM   最小影響出現次數 (默認: $MIN_OCCURRENCES)"
     echo "  -x, --max-exclusions NUM    最大排除樣本數量 (默認: $MAX_EXCLUSIONS)"
     echo "  -p, --pair-mode MODE        排除模式：full_pair 或 ranking_pair (默認: $PAIR_MODE)"
     echo "  -e, --evaluate-only         僅進行評估，不生成排除列表"
@@ -35,7 +37,7 @@ function show_help {
     echo "  -h, --help                  顯示此幫助信息"
     echo ""
     echo "使用示例:"
-    echo "  $0 --frequencies 500hz --threshold -10.0"
+    echo "  $0 --frequencies 500hz --threshold -20.0 --upper-threshold 20.0"
     echo "  $0 --metadata-dir /path/to/metadata --output-dir /path/to/output"
     echo "  $0 --debug --frequencies 500hz"
 }
@@ -69,6 +71,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -t|--threshold)
             THRESHOLD="$2"
+            shift 2
+            ;;
+        -u|--upper-threshold)
+            UPPER_THRESHOLD="$2"
             shift 2
             ;;
         -n|--min-occurrences)
@@ -110,7 +116,8 @@ if [ "$DEBUG" = true ]; then
     echo "輸出目錄: $OUTPUT_DIR"
     echo "頻率: ${FREQUENCIES[*]}"
     echo "材料: $MATERIAL"
-    echo "閾值: $THRESHOLD"
+    echo "下限閾值: $THRESHOLD"
+    echo "上限閾值: $UPPER_THRESHOLD"
     echo "最小出現次數: $MIN_OCCURRENCES"
     echo "最大排除數量: $MAX_EXCLUSIONS"
     echo "排除模式: $PAIR_MODE"
@@ -165,6 +172,7 @@ for FREQ in "${FREQUENCIES[@]}"; do
         log_debug "  --metadata-file: $METADATA_FILE"
         log_debug "  --output-file: $EXCLUSION_FILE"
         log_debug "  --threshold: $THRESHOLD"
+        log_debug "  --upper-threshold: $UPPER_THRESHOLD"
         log_debug "  --min-occurrences: $MIN_OCCURRENCES"
         log_debug "  --max-exclusions: $MAX_EXCLUSIONS"
 
@@ -172,6 +180,7 @@ for FREQ in "${FREQUENCIES[@]}"; do
             --metadata-file "$METADATA_FILE" \
             --output-file "$EXCLUSION_FILE" \
             --threshold "$THRESHOLD" \
+            --upper-threshold "$UPPER_THRESHOLD" \
             --min-occurrences "$MIN_OCCURRENCES" \
             --max-exclusions "$MAX_EXCLUSIONS" \
             --consider-both-samples \
